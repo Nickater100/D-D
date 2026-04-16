@@ -1,0 +1,32 @@
+{
+    "id": "mina-phandelver-srd",
+    "title": "La Mina Perdida de Phandelver (Intro)",
+    "description": "Una aventura clásica para aventureros de nivel 1.",
+    "starting_point": {
+        "location": "El Camino del Comercio",
+        "description": "Has estado escoltando una carreta de suministros hacia Phandalin. El sol está bajando y el camino parece inusualmente silencioso...",
+        "initial_objective": "Llega a Phandalin con los suministros."
+    },
+    "key_npcs": {
+        "gundren-rockseeker": {
+            "name": "Gundren Buscarroca",
+            "relationship": "Patrón",
+            "status": "Desaparecido",
+            "secret": "Tiene un mapa de la Cueva del Eco de las Olas."
+        },
+        "sildar-hallwinter": {
+            "name": "Sildar Hallwinter",
+            "relationship": "Escolta",
+            "status": "Prisionero",
+            "secret": "Es miembro de la Alianza de los Lores."
+        }
+    },
+    "encounters": [
+        {
+            "id": "emboscada-trasgos",
+            "trigger": "Al llegar a la curva del camino",
+            "enemies": ["Goblin", "Goblin"],
+            "reward_xp": 100
+        }
+    ]
+}

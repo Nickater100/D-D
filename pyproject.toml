@@ -1,0 +1,15 @@
+[project]
+name = "dnd-ai-android"
+version = "0.1.0"
+description = "A D&D 5e AI-driven game for Android built with Flet"
+dependencies = [
+    "flet",
+    "google-generativeai",
+    "requests",
+    "pydantic"
+]
+
+[tool.flet]
+app_name = "D&D AI Master"
+package_name = "com.nico.dndai"
+build_number = 1
