@@ -1,5 +1,5 @@
 import flet as ft
-from flet import icons, Colors as colors, View, Container, Column, Text, Divider, ElevatedButton, AppBar, ListView, ListTile, Icon, NavigationBar, NavigationBarDestination, FloatingActionButton, IconButton
+from flet import Icons as icons, Colors as colors, View, Container, Column, Text, Divider, ElevatedButton, AppBar, ListView, ListTile, Icon, NavigationBar, NavigationBarDestination, FloatingActionButton, IconButton
 import ui.styles as styles
 from ui.chat import get_chat_page
 from ui.sheets import get_sheet_page
@@ -49,8 +49,8 @@ def main(page: ft.Page):
         elif page.route == "/campaign":
             page.views.append(
                 View(
-                    "/campaign",
-                    [
+                    route="/campaign",
+                    controls=[
                         AppBar(title=Text("Historias Disponibles"), bgcolor=styles.SURFACE_COLOR),
                         ListView([
                             ListTile(
@@ -96,8 +96,8 @@ def main(page: ft.Page):
 
             page.views.append(
                 View(
-                    page.route,
-                    [
+                    route=page.route,
+                    controls=[
                         AppBar(
                             title=Text("Dungeon Master AI", color=styles.TEXT_COLOR),
                             bgcolor=styles.SURFACE_COLOR,

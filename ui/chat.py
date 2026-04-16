@@ -1,5 +1,5 @@
 import flet as ft
-from flet import icons, alignment, margin, CrossAxisAlignment, ListView, TextField, Row, Column, Container, IconButton, ElevatedButton, Text
+from flet import Icons as icons, alignment, margin, CrossAxisAlignment, ListView, TextField, Row, Column, Container, IconButton, ElevatedButton, Text
 import ui.styles as styles
 from ai.orchestrator import ai_orchestrator
 from ui.dice_roller import show_dice_modal

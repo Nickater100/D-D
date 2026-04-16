@@ -1,5 +1,5 @@
 import flet as ft
-from flet import icons, Colors as colors, Animation, AnimationCurve, Column, Container, Text, Icon, ElevatedButton, AlertDialog, TextButton, MainAxisAlignment, FontWeight, CrossAxisAlignment
+from flet import Icons as icons, Colors as colors, Animation, AnimationCurve, Column, Container, Text, Icon, ElevatedButton, AlertDialog, TextButton, MainAxisAlignment, FontWeight, CrossAxisAlignment
 import ui.styles as styles
 from engine.rules import rules_engine
 import time
