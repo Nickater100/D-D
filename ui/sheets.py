@@ -21,7 +21,7 @@ class StatCard(Container):
 class CharacterSheet(Container):
     def __init__(self, page):
         super().__init__()
-        self.page = page
+        self.main_page = page
         self.state = game_state.data["player"]
         
         # XP Progress

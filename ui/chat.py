@@ -16,8 +16,8 @@ class ChatMessage(Column):
                 bgcolor=styles.SURFACE_COLOR if is_dm else styles.GOLD_COLOR,
                 padding=15,
                 border_radius=10,
-                alignment=alignment.center_left if is_dm else alignment.center_right,
-                margin=margin.only(right=40 if is_dm else 0, left=0 if is_dm else 40),
+                alignment=ft.Alignment.CENTER_LEFT if is_dm else ft.Alignment.CENTER_RIGHT,
+                margin=ft.margin.only(right=40 if is_dm else 0, left=0 if is_dm else 40),
             )
         ]
         self.horizontal_alignment = CrossAxisAlignment.START if is_dm else CrossAxisAlignment.END
@@ -25,7 +25,7 @@ class ChatMessage(Column):
 class ChatView(Container):
     def __init__(self, page):
         super().__init__()
-        self.page = page
+        self.main_page = page
         self.chat_list = ListView(expand=True, spacing=15, padding=20, auto_scroll=True)
         self.input_field = TextField(
             hint_text="Describe tu acción...",
@@ -38,7 +38,7 @@ class ChatView(Container):
         # Quick Actions for the Player
         self.actions = Row([
             ElevatedButton("Atacar", on_click=lambda _: self.quick_action("Ataco al enemigo más cercano")),
-            ElevatedButton("Dados", icon=icons.CASINO, on_click=lambda _: show_dice_modal(self.page)),
+            ElevatedButton("Dados", icon=icons.CASINO, on_click=lambda _: show_dice_modal(self.main_page)),
             ElevatedButton("Descanso", on_click=lambda _: self.quick_action("Intento tomar un descanso corto")),
         ], scroll=ft.ScrollMode.AUTO)
 
@@ -66,12 +66,12 @@ class ChatView(Container):
         if not user_text: return
         self.input_field.value = ""
         self.chat_list.controls.append(ChatMessage("player", user_text))
-        self.page.update()
+        self.main_page.update()
         
         # IA narrating based on the referee state
         response = ai_orchestrator.get_response(user_text)
         self.chat_list.controls.append(ChatMessage("dm", response))
-        self.page.update()
+        self.main_page.update()
 
 def get_chat_page(page):
     return ChatView(page)
