@@ -24,27 +24,24 @@ def main(page: ft.Page):
             print("DEBUG: Appending splash view")
             page.views.append(
                 View(
-                    "/",
-                    [
-                        Container(
-                            content=Column([
-                                Text("D&D", size=80, weight="bold", color=styles.GOLD_COLOR),
-                                Text("AI MASTER", size=16, letter_spacing=5, color=styles.SUBTEXT_COLOR),
-                                Divider(height=50, color=colors.TRANSPARENT),
-                                ElevatedButton(
-                                    "INICIAR AVENTURA", 
-                                    bgcolor=styles.ACCENT_COLOR, 
-                                    color="white",
-                                    width=240, 
-                                    height=50,
-                                    on_click=lambda _: page.go("/campaign")
-                                )
-                            ], alignment="center", horizontal_alignment="center", expand=True),
-                            expand=True,
-                            bgcolor=styles.BACKGROUND_COLOR
+                    route="/",
+                    controls=[
+                        Text("D&D", size=80, weight="bold", color=styles.GOLD_COLOR),
+                        Text("AI MASTER", size=16, color=styles.SUBTEXT_COLOR),
+                        Divider(height=50, color=colors.TRANSPARENT),
+                        ElevatedButton(
+                            "INICIAR AVENTURA", 
+                            bgcolor=styles.ACCENT_COLOR, 
+                            color="white",
+                            width=240, 
+                            height=50,
+                            on_click=lambda _: page.go("/campaign")
                         )
                     ],
-                    padding=0
+                    padding=20,
+                    bgcolor=styles.BACKGROUND_COLOR,
+                    vertical_alignment=ft.MainAxisAlignment.CENTER,
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER
                 )
             )
 
@@ -119,7 +116,9 @@ def main(page: ft.Page):
         page.update()
 
     page.on_route_change = route_change
-    page.go(page.route if page.route else "/")
+    if not page.route:
+        page.route = "/"
+    route_change(None)
 
 if __name__ == "__main__":
     ft.run(main)
