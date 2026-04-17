@@ -3,6 +3,7 @@ import HomeMenu from './pages/HomeMenu';
 import CharacterRoster from './pages/CharacterRoster';
 import CharacterCreator from './pages/CharacterCreator';
 import CampaignMenu from './pages/CampaignMenu';
+import AdventureView from './pages/AdventureView';
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
         <Route path="/roster" element={<CharacterRoster />} />
         <Route path="/create-character" element={<CharacterCreator />} />
         <Route path="/campaigns" element={<CampaignMenu />} />
+        <Route path="/adventure" element={<AdventureView />} />
       </Routes>
     </Router>
   );
