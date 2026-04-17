@@ -1,67 +1,88 @@
+import { type Background2024 } from '../types/dnd';
+
 export const SRD_RACES = [
   {
     id: "dragonborn", name: "Dracónido", speed: 30, image: "/assets/warrior.png",
     description: "Nacidos de los dragones, como su nombre indica, los dracónidos caminan orgullosos por un mundo que los recibe con incomprensión y temor. Forjados por un linaje antiguo que les otorga escamas relucientes y un aliento letal, mantienen un fuerte sentido del honor arraigado en la tradición familiar.",
     alignment: "Los dracónidos tienden hacia los extremos, haciendo una elección consciente de un lado u otro. La mayoría son buenos.",
     size: "Mediano (Aprox. 250 libras y más de 6 pies).",
-    bonuses: { str: 2, cha: 1, dex: 0, con: 0, int: 0, wis: 0 }
+    bonuses: { str: 0, cha: 0, dex: 0, con: 0, int: 0, wis: 0 }
   },
   {
     id: "dwarf", name: "Enano", speed: 25, image: "/assets/warrior.png",
     description: "Audaces y robustos, los enanos son conocidos como guerreros hábiles, mineros y trabajadores de la piedra y el metal. Sus reinos cavados en lo profundo de las montañas resuenan con el choque de los martillos y el clamor del combate contra las amenazas del inframundo.",
     alignment: "La mayoría de los enanos son legales, creyendo firmemente en los beneficios de una sociedad bien ordenada.",
     size: "Mediano.",
-    bonuses: { con: 2, str: 0, dex: 0, int: 0, wis: 0, cha: 0 }
+    bonuses: { con: 0, str: 0, dex: 0, int: 0, wis: 0, cha: 0 }
   },
   {
     id: "elf", name: "Elfo", speed: 30, image: "/assets/mage.png",
     description: "Un pueblo mágico de gracia sobrenatural, los elfos viven en lugares de belleza etérea. Poseen una afinidad natural con la magia, las estrellas y la naturaleza libre. Suelen ser distantes y perciben el mundo a través del velo de su inmensa longevidad.",
     alignment: "Aman la libertad y la variedad, inclinándose hacia los aspectos más amables del caos.",
     size: "Mediano, constitución delgada.",
-    bonuses: { dex: 2, str: 0, con: 0, int: 0, wis: 0, cha: 0 }
+    bonuses: { dex: 0, str: 0, con: 0, int: 0, wis: 0, cha: 0 }
   },
   {
     id: "gnome", name: "Gnomo", speed: 25, image: "/assets/rogue.png",
     description: "Trozos vivos de energía e inventiva, los gnomos disfrutan de la vida como ningún otro. Creadores de ilusiones, artesanos ingeniosos e incansables investigadores, ven cada día como un regalo repleto de maravillas por descubrir.",
     alignment: "Tienden hacia naturalezas buenas y caóticas y son de buen corazón.",
     size: "Pequeño (Entre 3 y 4 pies de altura).",
-    bonuses: { int: 2, str: 0, dex: 0, con: 0, wis: 0, cha: 0 }
+    bonuses: { int: 0, str: 0, dex: 0, con: 0, wis: 0, cha: 0 }
   },
   {
     id: "half-elf", name: "Semielfo", speed: 30, image: "/assets/mage.png",
     description: "Atrapados entre dos mundos, los semielfos poseen tanto la curiosidad incesante de la humanidad como la gracia reservada de su linaje feérico. No suelen encajar del todo en ninguna sociedad, deambulando como diplomáticos, aventureros o solitarios exiliados.",
     alignment: "Comparten la vena caótica y amante de la libertad de su herencia élfica.",
     size: "Mediano.",
-    bonuses: { cha: 2, con: 1, dex: 1, str: 0, int: 0, wis: 0 }
+    bonuses: { cha: 0, con: 0, dex: 0, str: 0, int: 0, wis: 0 }
   },
   {
     id: "half-orc", name: "Semiorco", speed: 30, image: "/assets/warrior.png",
     description: "Ferozmente leales e imparables en la batalla, los semiorcos cargan con la fuerza bruta de las tribus pero poseen corazones que sienten intensamente. Suelen sobrevivir en los márgenes del mundo impulsados por su resistencia legendaria.",
     alignment: "Heredan la tendencia hacia el caos y la supervivencia brutal, rara vez son legales o puramente buenos.",
     size: "Mediano (Volumen enorme).",
-    bonuses: { str: 2, con: 1, dex: 0, int: 0, wis: 0, cha: 0 }
+    bonuses: { str: 0, con: 0, dex: 0, int: 0, wis: 0, cha: 0 }
   },
   {
     id: "halfling", name: "Mediano", speed: 25, image: "/assets/rogue.png",
     description: "Pequeños, intrépidos y sorprendentemente ágiles, los medianos sobreviven gracias a la suerte, la audacia y su férreo amor por las alegrías sencillas del hogar y una buena comida... antes de embarcarse en aventuras increíbles.",
     alignment: "Legales buenos, amables, bondadosos y compasivos.",
     size: "Pequeño.",
-    bonuses: { dex: 2, str: 0, con: 0, int: 0, wis: 0, cha: 0 }
+    bonuses: { dex: 0, str: 0, con: 0, int: 0, wis: 0, cha: 0 }
   },
   {
     id: "human", name: "Humano", speed: 30, image: "/assets/warrior.png",
     description: "La raza más adaptable, ambiciosa y variable del mundo. Con vidas cortas en comparación con otros, los humanos arden llenos de propósitos y son capaces de fundar grandes imperios, forjándose caminos estelares y dominando cualquier disciplina.",
     alignment: "Sin tendencia marcada; pueden ser virtuosos protectores o crueles tiranos.",
     size: "Mediano.",
-    bonuses: { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 }
+    bonuses: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 }
   },
   {
     id: "tiefling", name: "Tiflin", speed: 30, image: "/assets/mage.png",
     description: "Marcados por un linaje infernal y portadores de cuernos u ojos ígneos oscuros, los tiflin nunca escapan a la sospecha del resto. Sin embargo, su origen no dicta su alma, permitiéndoles emplear su magia sombría y encanto innato para bien o para mal.",
     alignment: "Su aislamiento les empuja hacia el caos, pero forjan su propio destino moral.",
     size: "Mediano.",
-    bonuses: { cha: 2, int: 1, str: 0, dex: 0, con: 0, wis: 0 }
+    bonuses: { cha: 0, int: 0, str: 0, dex: 0, con: 0, wis: 0 }
   }
+];
+
+export const SRD_BACKGROUNDS_2024: Background2024[] = [
+  { id: "acolyte", name: "Acólito", description: "Has pasado tu vida al servicio de un templo.", abilityOptions: ["int", "wis", "cha"], featId: "magic_initiate", skills: ["Perspicacia", "Religión"] },
+  { id: "artisan", name: "Artesano", description: "Eres experto en la creación de objetos.", abilityOptions: ["str", "dex", "int"], featId: "crafter", skills: ["Perspicacia", "Persuasión"] },
+  { id: "charlatan", name: "Charlatán", description: "Engañas a otros para tu beneficio.", abilityOptions: ["dex", "int", "cha"], featId: "skilled", skills: ["Engaño", "Juego de Manos"] },
+  { id: "criminal", name: "Criminal", description: "Vives al margen de la ley.", abilityOptions: ["dex", "int", "cha"], featId: "alert", skills: ["Engaño", "Sigilo"] },
+  { id: "entertainer", name: "Artista", description: "Vives para el aplauso del público.", abilityOptions: ["str", "dex", "cha"], featId: "musician", skills: ["Acrobacias", "Interpretación"] },
+  { id: "farmer", name: "Granjero", description: "Has trabajado la tierra con tus propias manos.", abilityOptions: ["str", "con", "wis"], featId: "tough", skills: ["Naturaleza", "Trato con Animales"] },
+  { id: "guard", name: "Guardia", description: "Proteges a los demás del peligro.", abilityOptions: ["str", "dex", "wis"], featId: "alert", skills: ["Atletismo", "Percepción"] },
+  { id: "guide", name: "Guía", description: "Conoces los caminos salvajes.", abilityOptions: ["dex", "con", "wis"], featId: "magic_initiate", skills: ["Sigilo", "Supervivencia"] },
+  { id: "hermit", name: "Ermitaño", description: "Buscas el conocimiento en la soledad.", abilityOptions: ["con", "wis", "cha"], featId: "healer", skills: ["Medicina", "Religión"] },
+  { id: "merchant", name: "Mercader", description: "Conoces el valor de cada moneda.", abilityOptions: ["con", "int", "cha"], featId: "lucky", skills: ["Perspicacia", "Persuasión"] },
+  { id: "noble", name: "Noble", description: "Naciste en el poder y el privilegio.", abilityOptions: ["str", "int", "cha"], featId: "skilled", skills: ["Historia", "Persuasión"] },
+  { id: "sage", name: "Sabio", description: "Buscas la verdad en los libros antiguos.", abilityOptions: ["con", "int", "wis"], featId: "magic_initiate", skills: ["Arcanos", "Historia"] },
+  { id: "sailor", name: "Marinero", description: "El mar es tu verdadero hogar.", abilityOptions: ["str", "dex", "wis"], featId: "tavern_brawler", skills: ["Atletismo", "Percepción"] },
+  { id: "scribe", name: "Escriba", description: "Documentas la historia que otros viven.", abilityOptions: ["dex", "int", "wis"], featId: "skilled", skills: ["Investigación", "Percepción"] },
+  { id: "soldier", name: "Soldado", description: "La guerra es lo único que conoces.", abilityOptions: ["str", "dex", "con"], featId: "savage_attacker", skills: ["Atletismo", "Intimidación"] },
+  { id: "wayfarer", name: "Vagabundo", description: "Creciste en las calles de la gran ciudad.", abilityOptions: ["dex", "int", "wis"], featId: "lucky", skills: ["Investigación", "Sigilo"] }
 ];
 
 export const SRD_CLASSES = [

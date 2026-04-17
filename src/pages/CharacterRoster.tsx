@@ -46,7 +46,8 @@ export default function CharacterRoster() {
                     <h3 className="font-display text-xl" style={{ margin: 0 }}>{char.name}</h3>
                     {isActive && <CheckCircle2 size={16} className="text-gold" />}
                   </div>
-                  <p className="text-sm text-secondary">Nivel {char.level} • {char.race} {char.className}</p>
+                  <p className="text-[10px] text-muted uppercase tracking-widest">{char.race} • {char.className} {char.subclass ? `(${char.subclass})` : ''}</p>
+                  <p className="text-sm text-secondary mt-1">{char.background} • {char.feats?.[0] ? char.feats[0].replace('_', ' ').toUpperCase() : 'Sin Dote'}</p>
                 </div>
                 
                 <button 

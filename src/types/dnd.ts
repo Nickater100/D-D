@@ -7,6 +7,21 @@ export interface AbilityScores {
   cha: number;
 }
 
+export interface Feat {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface Background2024 {
+  id: string;
+  name: string;
+  description: string;
+  abilityOptions: string[]; // e.g. ["str", "con", "wis"]
+  featId: string;
+  skills: string[];
+}
+
 export interface Character {
   id: string;
   name: string;
@@ -15,14 +30,14 @@ export interface Character {
   level: number;
   hp: number;
   maxHp: number;
-  ac: number; // Armor Class
+  ac: number; 
   attributes: AbilityScores;
   background: string;
   alignment: string;
-  portraitUrl?: string; // For later UI beauty
-  // Extended Depth Features
+  portraitUrl?: string; 
   subclass?: string;
   spells?: string[];
+  feats?: string[]; // List of feat IDs
 }
 
 export interface Campaign {
