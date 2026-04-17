@@ -20,7 +20,9 @@ export interface Character {
   background: string;
   alignment: string;
   portraitUrl?: string; // For later UI beauty
-  // In a real app we'd have spells, inventory, etc.
+  // Extended Depth Features
+  subclass?: string;
+  spells?: string[];
 }
 
 export interface Campaign {
