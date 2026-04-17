@@ -7,7 +7,7 @@ import time
 class DiceRoller(Container):
     def __init__(self, page, dice_type=20):
         super().__init__()
-        self.page = page
+        self.current_page = page
         self.dice_type = dice_type
         
         self.result_text = Text(
@@ -43,7 +43,10 @@ class DiceRoller(Container):
         # Visual animation "ficticia" (giro de icono)
         self.animation_placeholder.rotate = 3.14 * 2 # 360 degrees
         self.result_text.value = "..."
-        self.page.update()
+        if hasattr(self, 'update'):
+            self.update()
+        else:
+            self.current_page.update()
         
         time.sleep(0.5) # Simulate rolling time
         
@@ -51,22 +54,32 @@ class DiceRoller(Container):
         result = rules_engine.roll_dice(self.dice_type)
         self.result_text.value = str(result["total"])
         self.animation_placeholder.rotate = 0
-        self.page.update()
+        if hasattr(self, 'update'):
+            self.update()
+        else:
+            self.current_page.update()
 
 def show_dice_modal(page, dice_type=20):
     roller = DiceRoller(page, dice_type)
     
-    def close_modal(e):
-        page.dialog.open = False
-        page.update()
-
-    page.dialog = AlertDialog(
+    dialog = AlertDialog(
         content=roller,
-        actions=[
-            TextButton("CERRAR", on_click=close_modal)
-        ],
         actions_alignment=MainAxisAlignment.END,
         bgcolor=styles.BACKGROUND_COLOR,
     )
-    page.dialog.open = True
-    page.update()
+    
+    def close_modal(e):
+        if hasattr(page, 'close'):
+            page.close(dialog)
+        else:
+            dialog.open = False
+            page.update()
+
+    dialog.actions = [TextButton("CERRAR", on_click=close_modal)]
+
+    if hasattr(page, 'open'):
+        page.open(dialog)
+    else:
+        page.dialog = dialog
+        dialog.open = True
+        page.update()

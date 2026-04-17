@@ -69,6 +69,8 @@ class CharacterSheet(Container):
             ) for t in traits for f in t["features"]
         ])
 
+        self.padding = 20
+        self.expand = True
         self.content = Column([
             header,
             Divider(height=30, color=colors.WHITE10),
@@ -86,7 +88,7 @@ class CharacterSheet(Container):
             Divider(height=30, color=colors.TRANSPARENT),
             Text("RASGOS Y HABILIDADES", size=12, weight="bold", color=styles.GOLD_COLOR),
             traits_list
-        ], scroll=ft.ScrollMode.AUTO, expand=True, padding=20)
+        ], scroll=ft.ScrollMode.AUTO)
 
 def get_sheet_page(page):
     return CharacterSheet(page)
