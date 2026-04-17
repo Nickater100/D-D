@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronRight, Save, User, Shield, Info, Minus, Plus, Wand2, Star } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Save, User, Shield, Info, Minus, Plus, Wand2, Star, Flame, Heart, Sun, Eye, Sparkles, Skull } from 'lucide-react';
 import { useRoster } from '../store/useRoster';
 import type { Character } from '../types/dnd';
 import { SRD_RACES, SRD_CLASSES } from '../data/srd_es';
@@ -41,6 +41,7 @@ export default function CharacterCreator() {
   // Magic State
   const [selectedCantrips, setSelectedCantrips] = useState<string[]>([]);
   const [selectedLvl1, setSelectedLvl1] = useState<string[]>([]);
+  const [previewSpell, setPreviewSpell] = useState<any>(null);
 
   // Point Buy State
   const [assignedStats, setAssignedStats] = useState<Record<AbilityKey, number>>({
@@ -79,7 +80,7 @@ export default function CharacterCreator() {
     if (step === 3 && !hasMagic()) setStep(5);
     else setStep(s => Math.min(7, s + 1));
   };
-  
+
   const handlePrev = () => {
     if (step === 5 && !hasMagic()) setStep(3);
     else setStep(s => Math.max(1, s - 1));
@@ -157,9 +158,22 @@ export default function CharacterCreator() {
     return false;
   };
 
+  const getSpellIcon = (type: string) => {
+    switch (type) {
+      case "Daño": return <Flame size={20} className="text-orange-500" />;
+      case "Curación": return <Heart size={20} className="text-pink-500" />;
+      case "Soporte": return <Sun size={20} className="text-yellow-400" />;
+      case "Control": return <Eye size={20} className="text-purple-500" />;
+      case "Utilidad": return <Sparkles size={20} className="text-blue-300" />;
+      case "Defensa": return <Shield size={20} className="text-blue-500" />;
+      case "Daño Sotenido": return <Skull size={20} className="text-green-500" />;
+      default: return <Wand2 size={20} className="text-gray-400" />;
+    }
+  };
+
   return (
     <div className="container animate-fade-in flex-col gap-4" style={{ minHeight: '100vh', display: 'flex' }}>
-      
+
       {/* HEADER WIZARD */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -177,7 +191,7 @@ export default function CharacterCreator() {
 
       {/* CONTENT PANE (SPLIT LAYOUT) */}
       <div className="glass-panel flex gap-4" style={{ flex: 1, padding: '1rem', overflow: 'hidden' }}>
-        
+
         {/* === STEP 1: RACE === */}
         {step === 1 && (
           <>
@@ -200,15 +214,15 @@ export default function CharacterCreator() {
               ) : (
                 <div className="animate-fade-in flex-col gap-4 relative">
                   {selectedRace.image && (
-                     <div style={{ position: 'absolute', top: -20, right: -20, width: '200px', height: '200px', opacity: 0.3, maskImage: 'linear-gradient(to bottom, black 20%, transparent)', WebkitMaskImage: 'linear-gradient(to bottom, black 20%, transparent)' }}>
-                        <img src={selectedRace.image} alt="Archetype" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                     </div>
+                    <div style={{ position: 'absolute', top: -20, right: -20, width: '200px', height: '200px', opacity: 0.3, maskImage: 'linear-gradient(to bottom, black 20%, transparent)', WebkitMaskImage: 'linear-gradient(to bottom, black 20%, transparent)' }}>
+                      <img src={selectedRace.image} alt="Archetype" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
                   )}
 
                   <h1 className="font-display text-4xl text-gold" style={{ zIndex: 1 }}>{selectedRace.name}</h1>
                   <p className="text-secondary" style={{ zIndex: 1, lineHeight: '1.6' }}>{selectedRace.description}</p>
                   <p className="text-sm text-primary" style={{ zIndex: 1, marginTop: '1rem' }}><strong>Velocidad:</strong> {selectedRace.speed} pies</p>
-                  
+
                   <div style={{ zIndex: 1, marginTop: '1rem' }}>
                     <h3 className="font-display text-gold">Bonificaciones Base:</h3>
                     <div className="flex gap-2 flex-wrap" style={{ marginTop: '0.5rem' }}>
@@ -245,16 +259,16 @@ export default function CharacterCreator() {
             </div>
             <div className="w-full flex-col gap-4 relative" style={{ flex: 2, background: 'rgba(0,0,0,0.3)', padding: '1.5rem', borderRadius: '12px', overflowY: 'auto' }}>
               {!selectedClass ? (
-                 <div className="h-full flex-col items-center justify-center text-muted"><Shield size={64} opacity={0.2} /><p>Selecciona tu camino marcial o mágico.</p></div>
+                <div className="h-full flex-col items-center justify-center text-muted"><Shield size={64} opacity={0.2} /><p>Selecciona tu camino marcial o mágico.</p></div>
               ) : (
                 <div className="animate-fade-in flex-col gap-4 relative">
                   <div style={{ position: 'absolute', top: -20, right: -20, width: '200px', height: '200px', opacity: 0.2, maskImage: 'linear-gradient(to bottom, black 20%, transparent)', WebkitMaskImage: 'linear-gradient(to bottom, black 20%, transparent)' }}>
-                      <img src={`/assets/${selectedClass.group}.png`} alt="Class" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={`/assets/${selectedClass.group}.png`} alt="Class" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
 
                   <h1 className="font-display text-4xl text-gold" style={{ zIndex: 1 }}>{selectedClass.name}</h1>
                   <p className="text-secondary" style={{ zIndex: 1, lineHeight: '1.6' }}>{selectedClass.description}</p>
-                  
+
                   <div style={{ zIndex: 1, marginTop: '1rem' }}>
                     <p className="text-xl text-primary" style={{ zIndex: 1 }}><strong>Dado de Golpe:</strong> d{selectedClass.hit_die}</p>
                   </div>
@@ -279,7 +293,7 @@ export default function CharacterCreator() {
             </div>
             <div className="w-full flex-col gap-4" style={{ flex: 1.5, background: 'rgba(0,0,0,0.3)', padding: '1.5rem', borderRadius: '12px', overflowY: 'auto' }}>
               {!selectedSubclass ? (
-                 <div className="h-full flex-col items-center justify-center text-muted"><Star size={64} opacity={0.2} /><p>Selecciona tu Vocación / Juramento para comenzar.</p></div>
+                <div className="h-full flex-col items-center justify-center text-muted"><Star size={64} opacity={0.2} /><p>Selecciona tu Vocación / Juramento para comenzar.</p></div>
               ) : (
                 <div className="animate-fade-in flex-col gap-4">
                   <h1 className="font-display text-3xl text-gold">{selectedSubclass.name}</h1>
@@ -292,60 +306,80 @@ export default function CharacterCreator() {
 
         {/* === STEP 4: MAGIC === */}
         {step === 4 && (
-          <div className="flex-col w-full h-full gap-4 p-2 relative" style={{ overflowY: 'auto' }}>
-            <div className="flex justify-between items-center bg-black/40 p-4 rounded-xl border border-white/10" style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-              <div>
-                <p className="text-gold font-display text-2xl">{GET_CLASS_MAGIC_CAPACITY(selectedClass.id)?.magicType}</p>
-                <p className="text-sm text-secondary">Elige los conjuros iniciales de tu clase.</p>
+          <>
+            <div className="w-full flex-col gap-4" style={{ overflowY: 'auto', paddingRight: '10px', flex: 1.2 }}>
+              <div className="flex justify-between items-center bg-black/40 p-3 rounded-xl border border-white/10" style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                <div>
+                  <p className="text-gold font-display text-lg">{GET_CLASS_MAGIC_CAPACITY(selectedClass.id)?.magicType}</p>
+                </div>
+                <div className="flex gap-4">
+                  <div className="flex-col items-end">
+                    <span className="font-display text-lg text-purple-400">{selectedCantrips.length}/{GET_CLASS_MAGIC_CAPACITY(selectedClass.id)?.cantrips}</span>
+                    <span className="text-muted text-[10px] uppercase">Trucos</span>
+                  </div>
+                  <div className="flex-col items-end">
+                    <span className="font-display text-lg text-blue-400">{selectedLvl1.length}/{GET_CLASS_MAGIC_CAPACITY(selectedClass.id)?.spells}</span>
+                    <span className="text-muted text-[10px] uppercase">Lvl 1</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex gap-4">
-                <div className="flex-col items-end">
-                  <span className="font-display text-2xl text-purple-400">{selectedCantrips.length} / {GET_CLASS_MAGIC_CAPACITY(selectedClass.id)?.cantrips}</span>
-                  <span className="text-muted text-xs uppercase">Trucos</span>
-                </div>
-                <div className="flex-col items-end">
-                  <span className="font-display text-2xl text-blue-400">{selectedLvl1.length} / {GET_CLASS_MAGIC_CAPACITY(selectedClass.id)?.spells}</span>
-                  <span className="text-muted text-xs uppercase">Hechizos (Lvl 1)</span>
-                </div>
+
+              <h3 className="font-display text-md text-gold mt-2">Trucos</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {STARTER_SPELLS.cantrips.map(spell => {
+                  const isActive = selectedCantrips.includes(spell.id);
+                  const cap = GET_CLASS_MAGIC_CAPACITY(selectedClass.id)?.cantrips || 0;
+                  const isMaxed = selectedCantrips.length >= cap && !isActive;
+                  return (
+                    <button key={spell.id}
+                      onClick={() => { toggleSpell(spell.id, 'cantrip'); setPreviewSpell(spell); }}
+                      disabled={isMaxed}
+                      onMouseEnter={() => setPreviewSpell(spell)}
+                      className="glass-panel flex items-center justify-start gap-2 p-2 hover:border-purple-500/50"
+                      style={{ border: isActive ? '1px solid #c084fc' : '1px solid transparent', opacity: isMaxed ? 0.4 : 1, transition: 'all 0.2s', background: isActive ? 'rgba(192, 132, 252, 0.1)' : '' }}>
+                      {getSpellIcon(spell.type)}
+                      <span className="font-display text-purple-300 text-sm truncate">{spell.name}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <h3 className="font-display text-md text-gold mt-4">Hechizos (Nivel 1)</h3>
+              <div className="grid grid-cols-2 gap-2 mb-6">
+                {STARTER_SPELLS.level_1.map(spell => {
+                  const isActive = selectedLvl1.includes(spell.id);
+                  const cap = GET_CLASS_MAGIC_CAPACITY(selectedClass.id)?.spells || 0;
+                  const isMaxed = selectedLvl1.length >= cap && !isActive;
+                  return (
+                    <button key={spell.id}
+                      onClick={() => { toggleSpell(spell.id, 'lvl1'); setPreviewSpell(spell); }}
+                      disabled={isMaxed}
+                      onMouseEnter={() => setPreviewSpell(spell)}
+                      className="glass-panel flex items-center justify-start gap-2 p-2 hover:border-blue-500/50"
+                      style={{ border: isActive ? '1px solid #60a5fa' : '1px solid transparent', opacity: isMaxed ? 0.4 : 1, transition: 'all 0.2s', background: isActive ? 'rgba(96, 165, 250, 0.1)' : '' }}>
+                      {getSpellIcon(spell.type)}
+                      <span className="font-display text-blue-300 text-sm truncate">{spell.name}</span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
-            <h3 className="font-display text-xl text-gold mt-2">Trucos (Ilimitados)</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {STARTER_SPELLS.cantrips.map(spell => {
-                const isActive = selectedCantrips.includes(spell.id);
-                const cap = GET_CLASS_MAGIC_CAPACITY(selectedClass.id)?.cantrips || 0;
-                const isMaxed = selectedCantrips.length >= cap && !isActive;
-                return (
-                  <button key={spell.id} onClick={() => toggleSpell(spell.id, 'cantrip')} disabled={isMaxed} className="glass-panel text-left p-3 flex-col" style={{ border: isActive ? '1px solid #c084fc' : '', opacity: isMaxed ? 0.4 : 1 }}>
-                    <div className="flex justify-between w-full">
-                      <span className="font-display text-purple-300">{spell.name}</span>
-                      <span className="text-xs text-muted">{spell.type}</span>
-                    </div>
-                    <span className="text-sm text-secondary mt-1">{spell.desc}</span>
-                  </button>
-                )
-              })}
+            <div className="w-full flex-col gap-4 relative" style={{ flex: 1.5, background: 'rgba(0,0,0,0.3)', padding: '1.5rem', borderRadius: '12px', overflowY: 'auto' }}>
+              {!previewSpell ? (
+                <div className="h-full flex-col items-center justify-center text-muted"><Wand2 size={64} opacity={0.2} /><p className="mt-4 text-center">Pasa el cursor o selecciona un conjuro para revelar sus misterios.</p></div>
+              ) : (
+                <div className="animate-fade-in flex-col gap-4 relative">
+                  <div style={{ position: 'absolute', top: -10, right: -10, opacity: 0.1, transform: 'scale(2)' }}>
+                    {getSpellIcon(previewSpell.type)}
+                  </div>
+                  <h1 className="font-display text-3xl text-gold" style={{ zIndex: 1 }}>{previewSpell.name}</h1>
+                  <span className="px-2 py-1 bg-white/5 border border-white/10 rounded text-xs text-primary self-start uppercase tracking-wider">{previewSpell.type}</span>
+                  <p className="text-secondary text-md mt-4" style={{ zIndex: 1, lineHeight: '1.6' }}>{previewSpell.desc}</p>
+                </div>
+              )}
             </div>
-
-            <h3 className="font-display text-xl text-gold mt-4">Hechizos de Nivel 1</h3>
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              {STARTER_SPELLS.level_1.map(spell => {
-                const isActive = selectedLvl1.includes(spell.id);
-                const cap = GET_CLASS_MAGIC_CAPACITY(selectedClass.id)?.spells || 0;
-                const isMaxed = selectedLvl1.length >= cap && !isActive;
-                return (
-                  <button key={spell.id} onClick={() => toggleSpell(spell.id, 'lvl1')} disabled={isMaxed} className="glass-panel text-left p-3 flex-col" style={{ border: isActive ? '1px solid #60a5fa' : '', opacity: isMaxed ? 0.4 : 1 }}>
-                    <div className="flex justify-between w-full">
-                      <span className="font-display text-blue-300">{spell.name}</span>
-                      <span className="text-xs text-muted">{spell.type}</span>
-                    </div>
-                    <span className="text-sm text-secondary mt-1">{spell.desc}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          </>
         )}
 
         {/* === STEP 5: BACKGROUND === */}
@@ -396,7 +430,7 @@ export default function CharacterCreator() {
                 const bonus = getRacialBonus(stat);
                 const finalVal = base + bonus;
                 const mod = calculateModifier(finalVal);
-                
+
                 const costOfNext = getPointCost(base + 1) - getPointCost(base);
                 const canIncrease = base < 15 && pointsRemaining >= costOfNext;
                 const canDecrease = base > 8;
@@ -410,10 +444,10 @@ export default function CharacterCreator() {
                       <button onClick={() => increaseStat(stat)} disabled={!canIncrease} style={{ background: 'transparent', border: '1px solid var(--glass-border)', color: canIncrease ? 'white' : 'gray', padding: '4px', borderRadius: '4px' }}><Plus size={16} /></button>
                     </div>
                     <div className="w-full text-center p-2 rounded" style={{ background: bonus > 0 ? 'rgba(0, 204, 102, 0.1)' : 'rgba(255,255,255,0.05)', borderTop: bonus > 0 ? '1px solid #00cc66' : '1px solid transparent' }}>
-                       {bonus > 0 && <div className="text-sm text-green-400 font-bold">+{bonus} Raza = {finalVal}</div>}
-                       {bonus === 0 && <div className="text-sm text-secondary">Total = {finalVal}</div>}
+                      {bonus > 0 && <div className="text-sm text-green-400 font-bold">+{bonus} Raza = {finalVal}</div>}
+                      {bonus === 0 && <div className="text-sm text-secondary">Total = {finalVal}</div>}
                     </div>
-                    
+
                     <div className="absolute -top-3 -right-3 bg-fuchsia-800 rounded-full w-10 h-10 flex flex-col items-center justify-center font-bold text-lg shadow-[0_0_10px_rgba(122,31,162,0.8)] border border-white/20">
                       {mod >= 0 ? `+${mod}` : mod}
                     </div>
@@ -428,22 +462,22 @@ export default function CharacterCreator() {
         {step === 7 && (
           <div className="flex-col w-full h-full items-center justify-center gap-6 relative" style={{ overflowY: 'auto', padding: '2rem' }}>
             <div style={{ width: 120, height: 120, borderRadius: '50%', overflow: 'hidden', border: '2px solid var(--accent-gold)' }}>
-                {selectedRace?.image ? (
-                   <img src={selectedRace.image} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                   <div className="w-full h-full bg-black flex items-center justify-center"><User size={40} className="text-gold" /></div>
-                )}
+              {selectedRace?.image ? (
+                <img src={selectedRace.image} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <div className="w-full h-full bg-black flex items-center justify-center"><User size={40} className="text-gold" /></div>
+              )}
             </div>
-            
+
             <div className="flex-col w-full" style={{ maxWidth: '400px' }}>
               <label className="text-gold font-display text-sm mb-2 text-center">Firma tu Leyenda</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={charName}
                 onChange={e => setCharName(e.target.value)}
                 placeholder="Nombre del Héroe..."
-                style={{ 
-                  width: '100%', background: 'rgba(0,0,0,0.5)', border: '1px solid var(--accent-gold)', 
+                style={{
+                  width: '100%', background: 'rgba(0,0,0,0.5)', border: '1px solid var(--accent-gold)',
                   color: 'white', padding: '16px', borderRadius: '8px', fontSize: '1.2rem', fontFamily: 'Outfit',
                   outline: 'none', textAlign: 'center'
                 }}
@@ -465,13 +499,13 @@ export default function CharacterCreator() {
               </div>
               {hasMagic() && (
                 <div className="glass-panel text-center p-3 flex-col w-full border border-purple-500/50">
-                   <span className="text-muted text-xs mb-1">CONJUROS MEMORIZADOS</span>
-                   <div className="flex flex-wrap gap-2 justify-center">
-                     {[...selectedCantrips, ...selectedLvl1].map(sId => {
-                       const spell = [...STARTER_SPELLS.cantrips, ...STARTER_SPELLS.level_1].find(x => x.id === sId);
-                       return <span key={sId} className="px-2 py-1 bg-purple-900/30 rounded text-xs text-purple-200 border border-purple-500/30">{spell?.name}</span>
-                     })}
-                   </div>
+                  <span className="text-muted text-xs mb-1">CONJUROS MEMORIZADOS</span>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {[...selectedCantrips, ...selectedLvl1].map(sId => {
+                      const spell = [...STARTER_SPELLS.cantrips, ...STARTER_SPELLS.level_1].find(x => x.id === sId);
+                      return <span key={sId} className="px-2 py-1 bg-purple-900/30 rounded text-xs text-purple-200 border border-purple-500/30">{spell?.name}</span>
+                    })}
+                  </div>
                 </div>
               )}
             </div>
@@ -486,7 +520,7 @@ export default function CharacterCreator() {
         <button className="btn-secondary" disabled={step === 1} onClick={handlePrev} style={{ opacity: step === 1 ? 0.3 : 1 }}>
           ANTERIOR
         </button>
-        
+
         {step < 7 ? (
           <button className="btn-primary flex items-center gap-2" onClick={handleNext} disabled={isNextDisabled()}>
             SIGUIENTE <ChevronRight size={18} />
