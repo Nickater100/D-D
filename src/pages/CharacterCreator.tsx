@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, Save, User, Shield, Info, Minus, Plus, Wand2, Star, Flame, Heart, Sun, Eye, Sparkles, Skull, BookOpen, Medal } from 'lucide-react';
 import { useRoster } from '../store/useRoster';
@@ -6,6 +6,7 @@ import type { Character, AbilityScores } from '../types/dnd';
 import { SRD_RACES, SRD_CLASSES, SRD_BACKGROUNDS_2024 } from '../data/srd_es';
 import { STARTER_SPELLS, GET_CLASS_MAGIC_CAPACITY } from '../data/spells_es';
 import { ORIGIN_FEATS } from '../data/feats_es';
+import { ErrorBoundary, AttributeBonusSelector } from '../components/CharacterCreatorComponents';
 
 const ABILITY_MAP = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
 type AbilityKey = typeof ABILITY_MAP[number];
@@ -28,6 +29,9 @@ export default function CharacterCreator() {
   const [selectedSubclass, setSelectedSubclass] = useState<any>(null);
   const [selectedBackground, setSelectedBackground] = useState<any>(null);
   const [charName, setCharName] = useState('');
+  
+  const lastClickTime = useRef<number>(0);
+  const CLICK_COOLDOWN = 150; // ms
 
   // 2024 Ability Bonus State (Selection within background options)
   const [backgroundBonuses, setBackgroundBonuses] = useState<Partial<Record<AbilityKey, number>>>({});
@@ -53,12 +57,19 @@ export default function CharacterCreator() {
   const pointsRemaining = 27 - totalCost;
 
   const increaseStat = (stat: AbilityKey) => {
-    const current = assignedStats[stat];
-    if (current >= 15) return;
-    const costOfNext = getPointCost(current + 1) - getPointCost(current);
-    if (pointsRemaining >= costOfNext) {
-      setAssignedStats({ ...assignedStats, [stat]: current + 1 });
-    }
+    setAssignedStats(prev => {
+      const current = prev[stat];
+      if (current >= 15) return prev;
+      const totalCost = ABILITY_MAP.reduce((acc, s) => acc + getPointCost(prev[s]), 0);
+      const remaining = 27 - totalCost;
+      const costOfCurrent = getPointCost(current);
+      const costOfNext = getPointCost(current + 1);
+      const diff = costOfNext - costOfCurrent;
+      if (remaining >= diff) {
+        return { ...prev, [stat]: current + 1 };
+      }
+      return prev;
+    });
   };
 
   const throwStatError = (msg: string) => {
@@ -67,21 +78,27 @@ export default function CharacterCreator() {
   };
 
   const decreaseStat = (stat: AbilityKey) => {
-    const current = assignedStats[stat];
-    if (current <= 8) return;
-    setAssignedStats({ ...assignedStats, [stat]: current - 1 });
+    setAssignedStats(prev => {
+      const current = prev[stat];
+      if (current <= 8) return prev;
+      return { ...prev, [stat]: current - 1 };
+    });
   };
 
   const hasMagic = () => GET_CLASS_MAGIC_CAPACITY(selectedClass?.id) !== null;
 
   const handleNext = () => {
-    if (step === 3 && !hasMagic()) setStep(5);
-    else setStep(s => Math.min(6, s + 1));
+    setStep(prev => {
+      if (prev === 3 && !hasMagic()) return 5;
+      return Math.min(6, prev + 1);
+    });
   };
 
   const handlePrev = () => {
-    if (step === 5 && !hasMagic()) setStep(3);
-    else setStep(s => Math.max(1, s - 1));
+    setStep(prev => {
+      if (prev === 5 && !hasMagic()) return 3;
+      return Math.max(1, prev - 1);
+    });
   };
 
   const toggleSpell = (id: string, type: 'cantrip' | 'lvl1') => {
@@ -89,11 +106,17 @@ export default function CharacterCreator() {
     if (!caps) return;
 
     if (type === 'cantrip') {
-      if (selectedCantrips.includes(id)) setSelectedCantrips(selectedCantrips.filter(s => s !== id));
-      else if (selectedCantrips.length < caps.cantrips) setSelectedCantrips([...selectedCantrips, id]);
+      setSelectedCantrips(prev => {
+        if (prev.includes(id)) return prev.filter(s => s !== id);
+        if (prev.length < caps.cantrips) return [...prev, id];
+        return prev;
+      });
     } else {
-      if (selectedLvl1.includes(id)) setSelectedLvl1(selectedLvl1.filter(s => s !== id));
-      else if (selectedLvl1.length < caps.spells) setSelectedLvl1([...selectedLvl1, id]);
+      setSelectedLvl1(prev => {
+        if (prev.includes(id)) return prev.filter(s => s !== id);
+        if (prev.length < caps.spells) return [...prev, id];
+        return prev;
+      });
     }
   };
 
@@ -172,96 +195,43 @@ export default function CharacterCreator() {
     }
   };
 
-  const toggleBonus = (stat: AbilityKey) => {
-    const current = backgroundBonuses[stat] || 0;
-    const totalSelected = Object.values(backgroundBonuses).reduce((a, b) => a + (b || 0), 0);
+  // Throttled Atomic Functional Cycle
+  const cycleBonus = useCallback((stat: AbilityKey) => {
+    const now = Date.now();
+    if (now - lastClickTime.current < CLICK_COOLDOWN) return;
+    lastClickTime.current = now;
 
-    if (current > 0) {
-      // Remove or decrease
-      const newBonuses = { ...backgroundBonuses };
-      if (current === 2) delete newBonuses[stat];
-      else if (current === 1) delete newBonuses[stat];
-      setBackgroundBonuses(newBonuses);
-    } else {
-      // Add
-      if (totalSelected === 0) {
-        // First choice: can be +1 or +2
-        setBackgroundBonuses({ ...backgroundBonuses, [stat]: 2 });
-      } else if (totalSelected === 2) {
-        // Already have a +2, next must be +1 (in a different stat)
-        setBackgroundBonuses({ ...backgroundBonuses, [stat]: 1 });
-      } else if (totalSelected === 1) {
-        // Already have a +1, can add another +1
-        setBackgroundBonuses({ ...backgroundBonuses, [stat]: 1 });
-      } else if (totalSelected === 3) {
-        throwStatError("Ya has asignado tus 3 puntos de bonificación.");
-      }
-    }
-  };
-
-  const handleStatBonusClick = (stat: AbilityKey) => {
-    if (!selectedBackground) return;
-    if (!selectedBackground.abilityOptions.includes(stat)) return;
-
-    const current = backgroundBonuses[stat] || 0;
-    const total = Object.values(backgroundBonuses).reduce((a, b) => a + b, 0);
-
-    // D&D 2024: +2/+1 or +1/+1/+1
-    if (current === 2) {
-      // Toggle off +2
-      const nb = { ...backgroundBonuses };
-      delete nb[stat];
-      setBackgroundBonuses(nb);
-    } else if (current === 1) {
-      // Toggle off +1
-      const nb = { ...backgroundBonuses };
-      delete nb[stat];
-      setBackgroundBonuses(nb);
-    } else {
-      // Adding new
-      if (total === 0) {
-         // Ask or default to +2? Let's make it simple: first click is +1, second on same is +2? 
-         // Actually, let's do a simple cycle or separate buttons.
-         // Let's do: 1st click = +2, 2nd click = +1, 3rd = off.
-         setBackgroundBonuses({ ...backgroundBonuses, [stat]: 2 });
-      } else if (total === 2) {
-         // We have a +2 elsewhere, so this must be +1
-         setBackgroundBonuses({ ...backgroundBonuses, [stat]: 1 });
-      } else if (total === 1) {
-         // We have a +1 elsewhere, this must be +1
-         setBackgroundBonuses({ ...backgroundBonuses, [stat]: 1 });
-      } else if (total === 2 && Object.values(backgroundBonuses).includes(1)) {
-         // We have two +1s, this must be the third +1
-         setBackgroundBonuses({ ...backgroundBonuses, [stat]: 1 });
-      }
-    }
-  };
-
-  // Improved Cycle: Off -> +1 -> +2 (if possible) -> Off
-  const cycleBonus = (stat: AbilityKey) => {
     if (!selectedBackground?.abilityOptions.includes(stat)) return;
     
-    const current = backgroundBonuses[stat] || 0;
-    const nb = { ...backgroundBonuses };
-    const totalWithoutCurrent = Object.values(nb).reduce((a, b) => a + b, 0) - current;
+    setBackgroundBonuses(prev => {
+      const nb: Record<string, number> = {};
+      Object.entries(prev).forEach(([k, v]) => {
+        if (typeof v === 'number' && !Number.isNaN(v)) nb[k] = v;
+      });
 
-    if (current === 0) {
-      // Try +1
-      if (totalWithoutCurrent < 3) nb[stat] = 1;
-    } else if (current === 1) {
-      // Try +2
-      if (totalWithoutCurrent === 1) nb[stat] = 2; // Can go to +2 if we only have one +1 elsewhere
-      else delete nb[stat]; // Back to off
-    } else if (current === 2) {
-      // Back to off
-      delete nb[stat];
-    }
-    setBackgroundBonuses(nb);
-  };
+      const current = nb[stat] || 0;
+      const totalWithoutCurrent = Object.values(nb).reduce((a, b) => a + (Number(b) || 0), 0) - current;
+
+      if (current === 0) {
+        if (totalWithoutCurrent < 3) nb[stat] = 1;
+      } else if (current === 1) {
+        if (totalWithoutCurrent === 1) {
+          nb[stat] = 2;
+        } else {
+          delete nb[stat];
+        }
+      } else {
+        delete nb[stat];
+      }
+
+      return nb as Record<AbilityKey, number>;
+    });
+  }, [selectedBackground]);
 
   // --- RENDERING ---
   return (
-    <div className="container animate-fade-in flex-col gap-4" style={{ minHeight: '100vh', display: 'flex' }}>
+    <ErrorBoundary>
+      <div className="container animate-fade-in flex-col gap-4" style={{ minHeight: '100vh', display: 'flex' }}>
 
       {/* HEADER WIZARD */}
       <div className="flex items-center justify-between">
@@ -283,7 +253,7 @@ export default function CharacterCreator() {
 
         {/* === STEP 1: RACE === */}
         {step === 1 && (
-          <div className="flex w-full h-full gap-4">
+          <div key="step1" className="flex w-full h-full gap-4">
             <div className="flex-col gap-2 relative" style={{ overflowY: 'auto', paddingRight: '10px', flex: 1 }}>
               {SRD_RACES.map(r => (
                 <button key={r.id}
@@ -326,7 +296,7 @@ export default function CharacterCreator() {
 
         {/* === STEP 2: CLASS & SUBCLASS === */}
         {step === 2 && (
-          <div className="flex w-full h-full gap-4 overflow-hidden">
+          <div key="step2" className="flex w-full h-full gap-4 overflow-hidden">
             <div className="flex-col gap-2" style={{ overflowY: 'auto', paddingRight: '10px', flex: 1 }}>
               <h3 className="font-display text-gold mb-2 uppercase text-xs">Elige tu Clase</h3>
               {SRD_CLASSES.map(c => (
@@ -379,7 +349,7 @@ export default function CharacterCreator() {
 
         {/* === STEP 4: MAGIC === */}
         {step === 4 && (
-          <>
+          <div key="step4" className="flex w-full h-full gap-4 overflow-hidden">
             <div className="w-full flex-col gap-4" style={{ overflowY: 'auto', paddingRight: '10px', flex: 1.2 }}>
               <div className="flex justify-between items-center bg-black/40 p-3 rounded-xl border border-white/10" style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
                 <div>
@@ -452,12 +422,12 @@ export default function CharacterCreator() {
                 </div>
               )}
             </div>
-          </>
+          </div>
         )}
 
         {/* === STEP 3: BACKGROUND & FEAT === */}
         {step === 3 && (
-          <div className="flex w-full h-full gap-4 overflow-hidden">
+          <div key="step3" className="flex w-full h-full gap-4 overflow-hidden">
             <div className="flex-col gap-2" style={{ overflowY: 'auto', paddingRight: '10px', flex: 1 }}>
               {SRD_BACKGROUNDS_2024.map(bg => (
                 <button key={bg.id}
@@ -476,7 +446,7 @@ export default function CharacterCreator() {
               {!selectedBackground ? (
                 <div className="h-full flex-col items-center justify-center text-muted"><BookOpen size={64} opacity={0.2} /><p>Selecciona tu pasado.</p></div>
               ) : (
-                <div className="animate-fade-in flex-col gap-4 relative">
+                <div key={selectedBackground.id} className="animate-fade-in flex-col gap-4 relative">
                   <h1 className="font-display text-3xl text-gold">{selectedBackground.name}</h1>
                   <p className="text-secondary text-sm" style={{ lineHeight: '1.6' }}>{selectedBackground.description}</p>
                   
@@ -487,7 +457,7 @@ export default function CharacterCreator() {
                     {(() => {
                       const feat = ORIGIN_FEATS.find(f => f.id === selectedBackground.featId);
                       return (
-                        <div className="animate-fade-in">
+                        <div className="flex-col">
                           <p className="font-bold text-purple-400">{feat?.name}</p>
                           <p className="text-xs text-secondary mt-1">{feat?.description}</p>
                         </div>
@@ -495,25 +465,12 @@ export default function CharacterCreator() {
                     })()}
                   </div>
 
-                  <div className="flex-col gap-2 p-3 bg-black/40 rounded-xl border border-white/10">
-                    <div className="flex items-center gap-2 text-gold font-display text-sm mb-2">
-                      <Medal size={18} /> BONOS DE ATRIBUTO (Elige +2/+1 o +1/+1/+1)
-                    </div>
-                    <div className="flex gap-2">
-                      {selectedBackground.abilityOptions.map((statId: string) => {
-                        const stat = statId as AbilityKey;
-                        const val = backgroundBonuses[stat] || 0;
-                        return (
-                          <button key={stat}
-                            onClick={() => cycleBonus(stat)}
-                            className={`flex-1 p-2 rounded border text-sm font-display transition-all ${val > 0 ? 'bg-gold/20 border-gold text-gold' : 'bg-white/5 border-white/10 text-muted'}`}>
-                            {stat.toUpperCase()} {val > 0 ? `+${val}` : ''}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <p className="text-[10px] text-muted italic mt-2 text-center">Haz clic para asignar y ciclar los bonos (Total: 3 puntos)</p>
-                  </div>
+                  <AttributeBonusSelector 
+                    backgroundId={selectedBackground.id}
+                    abilityOptions={selectedBackground.abilityOptions}
+                    backgroundBonuses={backgroundBonuses}
+                    onCycle={cycleBonus}
+                  />
                 </div>
               )}
             </div>
@@ -522,7 +479,7 @@ export default function CharacterCreator() {
 
         {/* === STEP 5: ABILITIES === */}
         {step === 5 && (
-          <div className="flex-col w-full h-full gap-4 p-2 overflow-y-auto">
+          <div key="step5" className="flex-col w-full h-full gap-4 p-2 overflow-y-auto">
             <div className="flex justify-between items-center bg-black/40 p-4 rounded-xl border border-white/10" style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
               <div>
                 <p className="text-gold font-display text-2xl">Puntuaciones de Característica</p>
@@ -572,59 +529,103 @@ export default function CharacterCreator() {
 
         {/* === STEP 6: FINAL === */}
         {step === 6 && (
-          <div className="flex-col w-full h-full items-center justify-center gap-6 relative p-4 overflow-y-auto">
-            <div className="flex-col items-center gap-2">
-              <div style={{ width: 120, height: 120, borderRadius: '50%', overflow: 'hidden', border: '2px solid var(--accent-gold)' }}>
-                {selectedRace?.image ? (
-                  <img src={selectedRace.image} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <div className="w-full h-full bg-black flex items-center justify-center"><User size={40} className="text-gold" /></div>
-                )}
-              </div>
-              <h2 className="text-gold font-display text-2xl mt-2 tracking-widest uppercase">Resumen del Héroe</h2>
+          <div key="step6" className="flex w-full h-full gap-6 animate-fade-in overflow-hidden p-2">
+            
+            {/* LEFT: HERO IDENTITY */}
+            <div className="flex-col items-center gap-6 justify-center bg-black/40 rounded-3xl border border-white/10 relative p-8" style={{ flex: 1.2 }}>
+               <div className="absolute top-4 left-4 text-[10px] text-gold/40 font-display tracking-[0.3em] uppercase">Expediente de Héroe</div>
+               
+               <div className="relative group">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-gold to-orange-600 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                  <div className="relative w-48 h-48 rounded-full overflow-hidden border-2 border-gold/50 shadow-2xl">
+                    {selectedRace?.image ? (
+                      <img src={selectedRace.image} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-black/60 flex items-center justify-center"><User size={64} className="text-gold/20" /></div>
+                    )}
+                  </div>
+               </div>
+
+               <div className="flex-col w-full gap-2 items-center">
+                  <label className="text-gold/60 font-display text-[10px] uppercase tracking-widest">Nombre del Personaje</label>
+                  <input
+                    type="text"
+                    value={charName}
+                    onChange={e => setCharName(e.target.value)}
+                    placeholder="Escribe tu leyenda..."
+                    className="w-full font-display text-4xl text-center bg-transparent border-b-2 border-gold/20 focus:border-gold outline-none pb-4 transition-all placeholder:text-white/5"
+                  />
+               </div>
+
+               <div className="flex gap-2 w-full mt-4">
+                  <div className="flex-1 bg-white/5 border border-white/10 rounded-xl p-3 text-center">
+                     <div className="text-[10px] text-muted uppercase">Especie</div>
+                     <div className="text-gold font-display truncate">{selectedRace?.name}</div>
+                  </div>
+                  <div className="flex-1 bg-white/5 border border-white/10 rounded-xl p-3 text-center">
+                     <div className="text-[10px] text-muted uppercase">Clase</div>
+                     <div className="text-gold font-display truncate">{selectedClass?.name}</div>
+                  </div>
+               </div>
             </div>
 
-            <div className="flex-col w-full" style={{ maxWidth: '400px' }}>
-              <label className="text-gold font-display text-sm mb-2 text-center uppercase opacity-60">Firma tu Leyenda</label>
-              <input
-                type="text"
-                value={charName}
-                onChange={e => setCharName(e.target.value)}
-                placeholder="Nombre del Personaje..."
-                className="w-full font-display text-2xl text-center bg-transparent border-b-2 border-gold/50 focus:border-gold outline-none pb-2 transition-all"
-              />
-            </div>
-
-            <div className="flex gap-4 w-full flex-wrap justify-center mt-4" style={{ maxWidth: '600px' }}>
-              <div className="glass-panel text-center p-3 flex-col flex-1 min-w-[140px]">
-                <span className="text-muted text-[10px] uppercase font-bold tracking-tighter">ESPECIE</span>
-                <span className="text-gold font-display">{selectedRace?.name}</span>
-              </div>
-              <div className="glass-panel text-center p-3 flex-col flex-1 min-w-[140px]">
-                <span className="text-muted text-[10px] uppercase font-bold tracking-tighter">CLASE</span>
-                <span className="text-gold font-display">{selectedClass?.name}</span>
-              </div>
-              <div className="glass-panel text-center p-3 flex-col flex-1 min-w-[140px]">
-                <span className="text-muted text-[10px] uppercase font-bold tracking-tighter">TRASFONDO</span>
-                <span className="text-gold font-display">{selectedBackground?.name}</span>
-              </div>
+            {/* RIGHT: DETAILS & STATS */}
+            <div className="flex-col gap-4 overflow-y-auto pr-2" style={{ flex: 1.8 }}>
               
-              <div className="glass-panel text-center p-3 flex-col w-full border border-purple-500/30">
-                <span className="text-muted text-[10px] uppercase font-bold tracking-tighter mb-1">DOTE DE ORIGEN</span>
-                <span className="text-purple-300 font-display">{ORIGIN_FEATS.find(f => f.id === selectedBackground?.featId)?.name}</span>
+              <div className="grid grid-cols-2 gap-3">
+                 <div className="glass-panel p-4 border-l-4 border-l-purple-500">
+                    <div className="flex items-center gap-2 text-purple-400 font-display text-xs mb-1">
+                       <Medal size={14} /> TRASFONDO
+                    </div>
+                    <div className="text-white font-display text-lg">{selectedBackground?.name}</div>
+                 </div>
+                 <div className="glass-panel p-4 border-l-4 border-l-gold">
+                    <div className="flex items-center gap-2 text-gold font-display text-xs mb-1">
+                       <Star size={14} /> DOTE DE ORIGEN
+                    </div>
+                    <div className="text-white font-display text-lg">{ORIGIN_FEATS.find(f => f.id === selectedBackground?.featId)?.name}</div>
+                 </div>
+              </div>
+
+              <div className="glass-panel p-6 flex-col gap-4">
+                 <div className="text-[10px] text-gold/60 font-display tracking-widest uppercase mb-2 border-b border-white/10 pb-2">Atributos Finales</div>
+                 <div className="grid grid-cols-3 gap-y-6 gap-x-4">
+                    {ABILITY_MAP.map(stat => {
+                      const base = assignedStats[stat];
+                      const bonus = getBackgroundBonus(stat);
+                      const total = base + bonus;
+                      const mod = calculateModifier(total);
+                      return (
+                        <div key={stat} className="flex-col items-center">
+                           <div className="text-[10px] text-muted uppercase font-bold">{stat}</div>
+                           <div className="text-3xl font-display text-white">{total}</div>
+                           <div className="text-xs text-gold/60 font-bold bg-gold/10 px-2 rounded-full mt-1">
+                              {mod >= 0 ? `+${mod}` : mod}
+                           </div>
+                        </div>
+                      )
+                    })}
+                 </div>
               </div>
 
               {hasMagic() && (
-                <div className="glass-panel text-center p-3 flex-col w-full border border-blue-500/30">
-                  <span className="text-muted text-[10px] uppercase font-bold tracking-tighter mb-1">HECHIZOS MEMORIZADOS</span>
-                  <div className="flex flex-wrap gap-2 justify-center">
+                <div className="glass-panel p-6 flex-col gap-4">
+                  <div className="text-[10px] text-blue-400 font-display tracking-widest uppercase mb-2 border-b border-white/10 pb-2 flex items-center gap-2">
+                    <Wand2 size={16} /> Hechizos Preparados
+                  </div>
+                  <div className="flex flex-wrap gap-2">
                     {[...selectedCantrips, ...selectedLvl1].map(sId => {
                       const spell = [...STARTER_SPELLS.cantrips, ...STARTER_SPELLS.level_1].find(x => x.id === sId);
-                      return <span key={sId} className="px-2 py-1 bg-blue-900/30 rounded text-[10px] text-blue-200 border border-blue-500/30 uppercase">{spell?.name}</span>
+                      return <span key={sId} className="px-3 py-1.5 bg-blue-900/20 rounded-lg text-[11px] text-blue-200 border border-blue-500/20 uppercase tracking-tighter">{spell?.name}</span>
                     })}
                   </div>
                 </div>
               )}
+
+              <div className="mt-auto pt-4 flex-col gap-2">
+                <div className="text-[10px] text-muted italic text-center">Revisa bien tus elecciones antes de grabar tu nombre en los anales de la historia.</div>
+              </div>
+
             </div>
           </div>
         )}
@@ -632,22 +633,15 @@ export default function CharacterCreator() {
       </div>
 
       {/* FOOTER ACTIONS */}
-      <div className="flex items-center justify-between mt-4">
-        <button className="btn-secondary" disabled={step === 1} onClick={handlePrev} style={{ opacity: step === 1 ? 0.3 : 1 }}>
-          ANTERIOR
-        </button>
-
+      <div className="flex justify-between items-center bg-black/80 backdrop-blur-xl p-4 border-t border-white/10">
+        <button onClick={handlePrev} className="btn-secondary" disabled={step === 1}>ANTERIOR</button>
         {step < 6 ? (
-          <button className="btn-primary flex items-center gap-2" onClick={handleNext} disabled={isNextDisabled()}>
-            SIGUIENTE <ChevronRight size={18} />
-          </button>
+          <button onClick={handleNext} className="btn-primary" disabled={isNextDisabled()}>SIGUIENTE</button>
         ) : (
-          <button className="btn-primary flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-green-500 hover:from-emerald-500 hover:to-green-400" onClick={handleSave}>
-            <Save size={18} /> INICIAR LEYENDA
-          </button>
+          <button onClick={handleSave} className="btn-primary">INICIAR LEYENDA</button>
         )}
       </div>
-
     </div>
+    </ErrorBoundary>
   );
 }
