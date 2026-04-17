@@ -131,6 +131,13 @@ export default function CharacterCreator() {
       wis: assignedStats.wis + getBackgroundBonus('wis'),
       cha: assignedStats.cha + getBackgroundBonus('cha')
     };
+    const racialFeatures = (selectedRace.features || []).map((f: any) => ({ ...f, source: 'raza' as const }));
+    const bgFeat = ORIGIN_FEATS.find(f => f.id === selectedBackground.featId);
+    const backgroundFeatures: any[] = bgFeat ? [{ 
+      name: `Dote: ${bgFeat.name}`, 
+      description: bgFeat.description, 
+      source: 'trasfondo' 
+    }] : [];
 
     const newChar: Character = {
       id: crypto.randomUUID(),
@@ -147,7 +154,8 @@ export default function CharacterCreator() {
       background: selectedBackground.name,
       alignment: 'Neutral',
       portraitUrl: selectedRace.image,
-      feats: [selectedBackground.featId]
+      feats: [selectedBackground.featId],
+      features: [...racialFeatures, ...backgroundFeatures]
     };
 
     addCharacter(newChar);

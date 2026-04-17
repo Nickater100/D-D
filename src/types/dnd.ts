@@ -22,6 +22,12 @@ export interface Background2024 {
   skills: string[];
 }
 
+export interface Feature {
+  name: string;
+  description: string;
+  source: 'raza' | 'trasfondo' | 'clase' | 'otro';
+}
+
 export interface Character {
   id: string;
   name: string;
@@ -38,6 +44,7 @@ export interface Character {
   subclass?: string;
   spells?: string[];
   feats?: string[]; // List of feat IDs
+  features?: Feature[];
 }
 
 export interface Campaign {

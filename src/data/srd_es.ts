@@ -6,63 +6,105 @@ export const SRD_RACES = [
     description: "Nacidos de los dragones, como su nombre indica, los dracónidos caminan orgullosos por un mundo que los recibe con incomprensión y temor. Forjados por un linaje antiguo que les otorga escamas relucientes y un aliento letal, mantienen un fuerte sentido del honor arraigado en la tradición familiar.",
     alignment: "Los dracónidos tienden hacia los extremos, haciendo una elección consciente de un lado u otro. La mayoría son buenos.",
     size: "Mediano (Aprox. 250 libras y más de 6 pies).",
-    bonuses: { str: 0, cha: 0, dex: 0, con: 0, int: 0, wis: 0 }
+    bonuses: { str: 0, cha: 0, dex: 0, con: 0, int: 0, wis: 0 },
+    features: [
+      { name: "Aliento Dracónico", description: "Puedes exhalar una ráfaga de energía elemental en un cono de 15 pies.", source: "raza" },
+      { name: "Resistencia Dracónica", description: "Tienes resistencia al tipo de daño asociado a tu ancestro dragón.", source: "raza" }
+    ]
   },
   {
     id: "dwarf", name: "Enano", speed: 25, image: "/assets/warrior.png",
     description: "Audaces y robustos, los enanos son conocidos como guerreros hábiles, mineros y trabajadores de la piedra y el metal. Sus reinos cavados en lo profundo de las montañas resuenan con el choque de los martillos y el clamor del combate contra las amenazas del inframundo.",
     alignment: "La mayoría de los enanos son legales, creyendo firmemente en los beneficios de una sociedad bien ordenada.",
     size: "Mediano.",
-    bonuses: { con: 0, str: 0, dex: 0, int: 0, wis: 0, cha: 0 }
+    bonuses: { con: 0, str: 0, dex: 0, int: 0, wis: 0, cha: 0 },
+    features: [
+      { name: "Resiliencia Enana", description: "Ventaja en tiradas de salvación contra veneno y resistencia al daño de veneno.", source: "raza" },
+      { name: "Visión en la Oscuridad", description: "Puedes ver en la penumbra como si fuera luz brillante a 60 pies.", source: "raza" },
+      { name: "Sentido de la Piedra", description: "Tienes ventaja en pruebas de historia relacionadas con el origen de trabajos en piedra.", source: "raza" }
+    ]
   },
   {
     id: "elf", name: "Elfo", speed: 30, image: "/assets/mage.png",
     description: "Un pueblo mágico de gracia sobrenatural, los elfos viven en lugares de belleza etérea. Poseen una afinidad natural con la magia, las estrellas y la naturaleza libre. Suelen ser distantes y perciben el mundo a través del velo de su inmensa longevidad.",
     alignment: "Aman la libertad y la variedad, inclinándose hacia los aspectos más amables del caos.",
     size: "Mediano, constitución delgada.",
-    bonuses: { dex: 0, str: 0, con: 0, int: 0, wis: 0, cha: 0 }
+    bonuses: { dex: 0, str: 0, con: 0, int: 0, wis: 0, cha: 0 },
+    features: [
+      { name: "Linaje Feérico", description: "Ventaja en salvaciones contra ser Hechizado y la magia no puede dormirte.", source: "raza" },
+      { name: "Trance", description: "No necesitas dormir. Meditas profundamente durante 4 horas para obtener el descanso.", source: "raza" },
+      { name: "Visión en la Oscuridad", description: "Puedes ver en la penumbra como si fuera luz brillante a 60 pies.", source: "raza" }
+    ]
   },
   {
     id: "gnome", name: "Gnomo", speed: 25, image: "/assets/rogue.png",
     description: "Trozos vivos de energía e inventiva, los gnomos disfrutan de la vida como ningún otro. Creadores de ilusiones, artesanos ingeniosos e incansables investigadores, ven cada día como un regalo repleto de maravillas por descubrir.",
     alignment: "Tienden hacia naturalezas buenas y caóticas y son de buen corazón.",
     size: "Pequeño (Entre 3 y 4 pies de altura).",
-    bonuses: { int: 0, str: 0, dex: 0, con: 0, wis: 0, cha: 0 }
+    bonuses: { int: 0, str: 0, dex: 0, con: 0, wis: 0, cha: 0 },
+    features: [
+      { name: "Astucia de Gnomo", description: "Ventaja en todas las salvaciones de Inteligencia, Sabiduría y Carisma contra magia.", source: "raza" },
+      { name: "Visión en la Oscuridad", description: "Puedes ver en la penumbra como si fuera luz brillante a 60 pies.", source: "raza" }
+    ]
   },
   {
     id: "half-elf", name: "Semielfo", speed: 30, image: "/assets/mage.png",
     description: "Atrapados entre dos mundos, los semielfos poseen tanto la curiosidad incesante de la humanidad como la gracia reservada de su linaje feérico. No suelen encajar del todo en ninguna sociedad, deambulando como diplomáticos, aventureros o solitarios exiliados.",
     alignment: "Comparten la vena caótica y amante de la libertad de su herencia élfica.",
     size: "Mediano.",
-    bonuses: { cha: 0, con: 0, dex: 0, str: 0, int: 0, wis: 0 }
+    bonuses: { cha: 0, con: 0, dex: 0, str: 0, int: 0, wis: 0 },
+    features: [
+      { name: "Linaje Feérico", description: "Ventaja en salvaciones contra ser hechizado y la magia no puede dormirte.", source: "raza" },
+      { name: "Versatilidad", description: "Obtienes competencia en dos habilidades a tu elección.", source: "raza" },
+      { name: "Visión en la Oscuridad", description: "Puedes ver en la penumbra como si fuera luz brillante a 60 pies.", source: "raza" }
+    ]
   },
   {
     id: "half-orc", name: "Semiorco", speed: 30, image: "/assets/warrior.png",
     description: "Ferozmente leales e imparables en la batalla, los semiorcos cargan con la fuerza bruta de las tribus pero poseen corazones que sienten intensamente. Suelen sobrevivir en los márgenes del mundo impulsados por su resistencia legendaria.",
     alignment: "Heredan la tendencia hacia el caos y la supervivencia brutal, rara vez son legales o puramente buenos.",
     size: "Mediano (Volumen enorme).",
-    bonuses: { str: 0, con: 0, dex: 0, int: 0, wis: 0, cha: 0 }
+    bonuses: { str: 0, con: 0, dex: 0, int: 0, wis: 0, cha: 0 },
+    features: [
+      { name: "Resistencia Incansable", description: "Cuando caes a 0 HP y no mueres, puedes quedarte a 1 HP (1 vez por descanso largo).", source: "raza" },
+      { name: "Ataques Salvajes", description: "Al sacar un crítico, puedes tirar uno de los dados de daño una vez más y sumarlo.", source: "raza" },
+      { name: "Visión en la Oscuridad", description: "Puedes ver en la penumbra como si fuera luz brillante a 60 pies.", source: "raza" }
+    ]
   },
   {
     id: "halfling", name: "Mediano", speed: 25, image: "/assets/rogue.png",
     description: "Pequeños, intrépidos y sorprendentemente ágiles, los medianos sobreviven gracias a la suerte, la audacia y su férreo amor por las alegrías sencillas del hogar y una buena comida... antes de embarcarse en aventuras increíbles.",
     alignment: "Legales buenos, amables, bondadosos y compasivos.",
     size: "Pequeño.",
-    bonuses: { dex: 0, str: 0, con: 0, int: 0, wis: 0, cha: 0 }
+    bonuses: { dex: 0, str: 0, con: 0, int: 0, wis: 0, cha: 0 },
+    features: [
+      { name: "Suertudo", description: "Al sacar un 1 natural en un ataque o salvación, puedes volver a tirar el dado.", source: "raza" },
+      { name: "Valiente", description: "Ventaja en salvaciones contra ser asustado.", source: "raza" },
+      { name: "Agilidad Mediana", description: "Puedes moverte a través del espacio de cualquier criatura de tamaño superior al tuyo.", source: "raza" }
+    ]
   },
   {
     id: "human", name: "Humano", speed: 30, image: "/assets/warrior.png",
     description: "La raza más adaptable, ambiciosa y variable del mundo. Con vidas cortas en comparación con otros, los humanos arden llenos de propósitos y son capaces de fundar grandes imperios, forjándose caminos estelares y dominando cualquier disciplina.",
     alignment: "Sin tendencia marcada; pueden ser virtuosos protectores o crueles tiranos.",
     size: "Mediano.",
-    bonuses: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 }
+    bonuses: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 },
+    features: [
+      { name: "Recurso Humano", description: "Cuentas con ventaja en una prueba de habilidad en la que tengas competencia (1 vez por descanso largo).", source: "raza" },
+      { name: "Dote de Origen Extra", description: "Obtienes una dote de origen adicional de tu elección.", source: "raza" }
+    ]
   },
   {
     id: "tiefling", name: "Tiflin", speed: 30, image: "/assets/mage.png",
     description: "Marcados por un linaje infernal y portadores de cuernos u ojos ígneos oscuros, los tiflin nunca escapan a la sospecha del resto. Sin embargo, su origen no dicta su alma, permitiéndoles emplear su magia sombría y encanto innato para bien o para mal.",
     alignment: "Su aislamiento les empuja hacia el caos, pero forjan su propio destino moral.",
     size: "Mediano.",
-    bonuses: { cha: 0, int: 0, str: 0, dex: 0, con: 0, wis: 0 }
+    bonuses: { cha: 0, int: 0, str: 0, dex: 0, con: 0, wis: 0 },
+    features: [
+      { name: "Resistencia Infernal", description: "Tienes resistencia al daño de fuego.", source: "raza" },
+      { name: "Legado Infernal", description: "Conoces el truco Taumaturgia. A niveles superiores obtienes Reprensión Infernal y Oscuridad.", source: "raza" },
+      { name: "Visión en la Oscuridad", description: "Puedes ver en la penumbra como si fuera luz brillante a 60 pies.", source: "raza" }
+    ]
   }
 ];
 
