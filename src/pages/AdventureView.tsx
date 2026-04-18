@@ -9,6 +9,7 @@ import { getAIProvider } from '../services/ai';
 import type { ChatMessage } from '../services/ai';
 import { extractRollRequest, rollDice } from '../utils/diceUtils';
 import type { RollResult, RollRequest } from '../utils/diceUtils';
+import { ADVENTURE_MODULES } from '../data/adventures';
 
 // ─── AI Service (Now handled via .env) ───────────────────────────────────────
 
@@ -184,7 +185,7 @@ const SystemBubble = React.memo(({ text }: { text: string }) => (
 export default function AdventureView() {
   const navigate = useNavigate();
   const { characters, activeCharacterId } = useRoster();
-  const { messages, isLoading, addMessage, setLoading, startSession, clearSession } = useGameSession();
+  const { messages, isLoading, addMessage, setLoading, startSession, clearSession, activeModuleId } = useGameSession();
 
   const [inputText, setInputText] = useState('');
   const [streamingText, setStreamingText] = useState('');
@@ -199,6 +200,8 @@ export default function AdventureView() {
   const sessionStarted = useRef(false);
 
   const character = characters.find(c => c.id === activeCharacterId);
+  const activeModule = ADVENTURE_MODULES.find(m => m.id === activeModuleId);
+
   const charSpells = character
     ? [...STARTER_SPELLS.cantrips, ...STARTER_SPELLS.level_1].filter(s => character.spells?.includes(s.id))
     : [];
@@ -230,7 +233,7 @@ export default function AdventureView() {
           text: m.text,
         }));
 
-      const systemPrompt = buildSystemPrompt(character);
+      const systemPrompt = buildSystemPrompt(character, activeModule);
       const promptText = isOpening
         ? 'Comienza la aventura con una apertura épica.'
         : userText ?? '';
@@ -303,9 +306,15 @@ export default function AdventureView() {
   useEffect(() => {
     if (!character || sessionStarted.current) return;
     sessionStarted.current = true;
-    startSession(character.id);
-    sendMessage(null, true);
-  }, [character]);
+    
+    if (messages.length === 0) {
+      if (activeModule?.startingMessage) {
+        addMessage({ role: 'model', text: activeModule.startingMessage });
+      } else {
+        sendMessage(null, true);
+      }
+    }
+  }, [character, activeModule, messages.length, sendMessage, addMessage]);
 
   // ─── Handle player send ───────────────────────────────────────────────────
   const handleSend = () => {
@@ -320,12 +329,12 @@ export default function AdventureView() {
   };
 
   const handleRestart = () => {
+    if (!character) return;
     sessionStarted.current = false;
     clearSession();
     setTimeout(() => {
       sessionStarted.current = true;
-      startSession(character!.id);
-      sendMessage(null, true);
+      startSession(character.id, activeModuleId);
     }, 100);
   };
 

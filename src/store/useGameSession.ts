@@ -10,9 +10,10 @@ interface GameSessionState {
   messages: ChatMessage[];
   isLoading: boolean;
   sessionCharacterId: string | null;
+  activeModuleId: string | null;
   addMessage: (msg: Omit<ChatMessage, 'timestamp'>) => void;
   setLoading: (v: boolean) => void;
-  startSession: (characterId: string) => void;
+  startSession: (characterId: string, moduleId?: string | null) => void;
   clearSession: () => void;
 }
 
@@ -20,6 +21,7 @@ export const useGameSession = create<GameSessionState>((set) => ({
   messages: [],
   isLoading: false,
   sessionCharacterId: null,
+  activeModuleId: null,
 
   addMessage: (msg) =>
     set((state) => ({
@@ -28,8 +30,8 @@ export const useGameSession = create<GameSessionState>((set) => ({
 
   setLoading: (v) => set({ isLoading: v }),
 
-  startSession: (characterId) =>
-    set({ sessionCharacterId: characterId, messages: [], isLoading: false }),
+  startSession: (characterId, moduleId = null) =>
+    set({ sessionCharacterId: characterId, activeModuleId: moduleId, messages: [], isLoading: false }),
 
   clearSession: () =>
     set({ messages: [], isLoading: false, sessionCharacterId: null }),

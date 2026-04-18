@@ -1,4 +1,5 @@
 import type { Character } from '../types/dnd';
+import type { AdventureModule } from './adventures';
 
 // Helper to compute ability modifier
 const mod = (score: number) => {
@@ -11,7 +12,7 @@ const STAT_NAMES: Record<string, string> = {
   int: 'Inteligencia', wis: 'Sabiduría', cha: 'Carisma'
 };
 
-export function buildSystemPrompt(character: Character): string {
+export function buildSystemPrompt(character: Character, module?: AdventureModule | null): string {
   const attrs = Object.entries(character.attributes)
     .map(([k, v]) => `${STAT_NAMES[k]} ${v} (${mod(v as number)})`)
     .join(', ');
@@ -20,9 +21,16 @@ export function buildSystemPrompt(character: Character): string {
   const spells = character.spells?.length ? character.spells.join(', ') : 'Ninguno.';
   const feats = character.feats?.join(', ') ?? 'Ninguno.';
 
+  const moduleContext = module ? `
+══════════════════════════════════
+CONTEXTO DE LA AVENTURA: ${module.title}
+══════════════════════════════════
+${module.systemContext || 'Inicia una aventura épica.'}
+` : '';
+
   return `Eres un Dungeon Master magistral para una partida de D&D 5a Edición (2024) en español. 
 Eres épico, descriptivo, justo y dramático. Narras con tensión y evocas atmósferas vívidas.
-
+${moduleContext}
 ══════════════════════════════════
 FICHA DEL HÉROE
 ══════════════════════════════════
@@ -57,6 +65,5 @@ REGLAS DE CONDUCTA PARA EL DM:
 8. El tono es épico y oscuro, propio de la fantasía heroica.
 9. Cuando pidas una [TIRADA:], DETENTE. El sistema generará un mensaje como "[SISTEMA: Resultado de la tirada...]" que te indicará qué ha sucedido. NO inventes el resultado tú mismo; espera a recibirlo para narrar las consecuencias.
 
-INICIO: Cuando el jugador comience, selecciona un escenario inicial apropiado para su clase y trasfondo. 
-Descríbelo en una apertura corta y dramática de 3-4 oraciones. Luego pregunta qué hace.`;
+INICIO: ${module?.startingMessage ? 'La IA NO debe generar la apertura, el jugador ya la ha leído. Espera a su primera acción para continuar la historia siguiendo el contexto.' : 'Cuando el jugador comience, selecciona un escenario inicial apropiado para su clase y trasfondo. Descríbelo en una apertura corta y dramática de 3-4 oraciones. Luego pregunta qué hace.'}`;
 }

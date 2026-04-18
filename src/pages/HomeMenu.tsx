@@ -15,10 +15,10 @@ export default function HomeMenu() {
       <div className="glass-panel flex-col gap-4" style={{ padding: '2rem', width: '100%' }}>
         <button 
           className="btn-primary flex items-center justify-center gap-2" 
-          onClick={() => navigate('/adventure')}
+          onClick={() => navigate('/campaigns')}
         >
           <BookOpen size={20} />
-          INICIAR AVENTURA
+          EXPLORAR HISTORIAS
         </button>
 
         <div style={{ height: '1px', background: 'var(--glass-border)', margin: '1rem 0' }}></div>
