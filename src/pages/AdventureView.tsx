@@ -7,6 +7,8 @@ import { buildSystemPrompt } from '../data/dmPrompt';
 import { STARTER_SPELLS } from '../data/spells_es';
 import { getAIProvider } from '../services/ai';
 import type { ChatMessage } from '../services/ai';
+import { extractRollRequest, rollDice } from '../utils/diceUtils';
+import type { RollResult } from '../utils/diceUtils';
 
 // ─── AI Service (Now handled via .env) ───────────────────────────────────────
 
@@ -70,6 +72,75 @@ const PlayerBubble = React.memo(({ text }: { text: string }) => (
   </div>
 ));
 
+// ─── Animated d20 Component ──────────────────────────────────────────────────
+const D20Die = ({ isRolling, result }: { isRolling: boolean; result: number | null }) => (
+  <div style={{
+    width: '60px', height: '60px', position: 'relative',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    transform: isRolling ? 'rotate(360deg)' : 'none',
+    transition: 'transform 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+  }}>
+    <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%', filter: 'drop-shadow(0 0 8px rgba(212,175,55,0.4))' }}>
+      <path d="M50 5 L95 25 L95 75 L50 95 L5 75 L5 25 Z" fill="rgba(8, 8, 20, 0.9)" stroke="#d4af37" strokeWidth="2"/>
+      <path d="M50 5 L50 95 M5 25 L95 25 M5 75 L95 75 M50 5 L5 75 M50 5 L95 75 M5 25 L50 95 M95 25 L50 95" stroke="#d4af37" strokeWidth="1" opacity="0.5"/>
+      <text x="50" y="58" textAnchor="middle" fill="#d4af37" fontSize="24" fontWeight="bold" fontFamily="var(--font-display)">
+        {isRolling ? '?' : (result || 20)}
+      </text>
+    </svg>
+  </div>
+);
+
+// ─── Dice Roller Overlay ─────────────────────────────────────────────────────
+const DiceOverlay = ({ formula, isRolling, result, onRoll }: any) => (
+  <div style={{
+    position: 'absolute', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
+    width: '90%', maxWidth: '400px', background: 'rgba(8, 8, 20, 0.95)',
+    border: '1px solid var(--accent-gold)', borderRadius: '16px',
+    padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.8), 0 0 20px rgba(212,175,55,0.1)',
+    zIndex: 30, animation: 'slideUp 0.3s ease-out'
+  }}>
+    <div style={{ textAlign: 'center' }}>
+      <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 4px' }}>Tirada Requerida</p>
+      <h3 style={{ margin: 0, color: 'var(--accent-gold)', fontSize: '20px', fontFamily: 'var(--font-display)' }}>{formula}</h3>
+    </div>
+    
+    <D20Die isRolling={isRolling} result={result?.dice} />
+    
+    <button 
+      className="btn-primary" 
+      onClick={onRoll} 
+      disabled={isRolling}
+      style={{ width: '100%', padding: '12px', opacity: isRolling ? 0.7 : 1 }}
+    >
+      {isRolling ? 'LANZANDO...' : 'LANZAR DADO'}
+    </button>
+  </div>
+);
+
+// ─── System Message Bubble ───────────────────────────────────────────────────
+const SystemBubble = React.memo(({ text }: { text: string }) => (
+  <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0' }}>
+    <div style={{
+      background: 'rgba(212, 175, 55, 0.05)',
+      border: '1px solid rgba(212, 175, 55, 0.2)',
+      borderRadius: '8px',
+      padding: '8px 24px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      color: 'var(--accent-gold)',
+      fontSize: '12px',
+      fontStyle: 'italic',
+      letterSpacing: '0.05em',
+      boxShadow: 'inset 0 0 15px rgba(212,175,55,0.05)'
+    }}>
+      <RotateCcw size={14} />
+      {text}
+    </div>
+  </div>
+));
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AdventureView() {
   const navigate = useNavigate();
@@ -80,6 +151,9 @@ export default function AdventureView() {
   const [streamingText, setStreamingText] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingRoll, setPendingRoll] = useState<string | null>(null);
+  const [isRolling, setIsRolling] = useState(false);
+  const [rollResult, setRollResult] = useState<RollResult | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -135,6 +209,12 @@ export default function AdventureView() {
 
       addMessage({ role: 'model', text: fullResponse });
       setStreamingText('');
+
+      // Check for pending roll
+      const rollFormula = extractRollRequest(fullResponse);
+      if (rollFormula) {
+        setPendingRoll(rollFormula);
+      }
     } catch (err: any) {
       console.error('AI error:', err);
       const isConfigError = err.message?.includes('Configuración incompleta');
@@ -147,6 +227,32 @@ export default function AdventureView() {
       setLoading(false);
     }
   }, [character, messages, addMessage, setLoading]);
+
+  const handleRoll = async () => {
+    if (!pendingRoll || isRolling) return;
+    
+    setIsRolling(true);
+    setRollResult(null);
+
+    // Initial wait for animation
+    await new Promise(r => setTimeout(r, 1500));
+    
+    const result = rollDice(pendingRoll);
+    setRollResult(result);
+    
+    // Wait for display
+    await new Promise(r => setTimeout(r, 1000));
+    
+    const resultText = `Tirada realizada para [${result.formula}]. Resultado: ${result.total} (${result.dice} + ${result.modifier})`;
+    addMessage({ role: 'system', text: resultText });
+    
+    setPendingRoll(null);
+    setIsRolling(false);
+    setRollResult(null);
+
+    // Send the result to the AI automatically
+    sendMessage(`[SISTEMA: El jugador ha realizado la tirada solicitada. Resultado: ${result.total} (${result.dice} + ${result.modifier})]`);
+  };
 
   // ─── Start session on mount ───────────────────────────────────────────────
   useEffect(() => {
@@ -196,10 +302,12 @@ export default function AdventureView() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
-      {/* CSS for blink animation */}
+      {/* CSS for animations */}
       <style>{`
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+        @keyframes slideUp { from{transform: translateX(-50%) translateY(20px); opacity:0} to{transform: translateX(-50%) translateY(0); opacity:1} }
       `}</style>
+
 
       {/* ─── HEADER ─────────────────────────────────────────────────────── */}
       <div style={{
@@ -268,11 +376,11 @@ export default function AdventureView() {
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '760px', margin: '0 auto' }}>
-            {messages.map((msg, i) =>
-              msg.role === 'model'
-                ? <DmBubble key={i} text={msg.text} />
-                : <PlayerBubble key={i} text={msg.text} />
-            )}
+            {messages.map((msg, i) => {
+              if (msg.role === 'model') return <DmBubble key={i} text={msg.text} />;
+              if (msg.role === 'user') return <PlayerBubble key={i} text={msg.text} />;
+              return <SystemBubble key={i} text={msg.text} />;
+            })}
             {streamingText && <DmBubble text={streamingText} isStreaming />}
             {isLoading && !streamingText && (
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '4px 0' }}>
@@ -355,6 +463,16 @@ export default function AdventureView() {
         </div>
       </div>
 
+      {/* ─── DICE OVERLAY ────────────────────────────────────────────────── */}
+      {pendingRoll && (
+        <DiceOverlay 
+          formula={pendingRoll} 
+          isRolling={isRolling} 
+          result={rollResult}
+          onRoll={handleRoll}
+        />
+      )}
+
       {/* ─── INPUT BAR (fixed bottom) ────────────────────────────────────── */}
       <div style={{
         position: 'fixed', bottom: 0, left: 0,
@@ -372,16 +490,16 @@ export default function AdventureView() {
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={isLoading}
-            placeholder="¿Qué hace tu personaje...?"
+            disabled={isLoading || !!pendingRoll}
+            placeholder={pendingRoll ? "Completa la tirada para continuar..." : "¿Qué hace tu personaje...?"}
             rows={1}
             style={{
               flex: 1,
               background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.1)',
+              border: pendingRoll ? '1px solid rgba(212,175,55,0.3)' : '1px solid rgba(255,255,255,0.1)',
               borderRadius: '12px',
               padding: '10px 14px',
-              color: 'var(--text-primary)',
+              color: pendingRoll ? 'var(--text-muted)' : 'var(--text-primary)',
               fontSize: '14px',
               resize: 'none',
               outline: 'none',
@@ -396,16 +514,16 @@ export default function AdventureView() {
           />
           <button
             onClick={handleSend}
-            disabled={isLoading || !inputText.trim()}
+            disabled={isLoading || !inputText.trim() || !!pendingRoll}
             style={{
               width: '44px', height: '44px',
               borderRadius: '12px',
-              background: isLoading || !inputText.trim()
+              background: (isLoading || !inputText.trim() || !!pendingRoll)
                 ? 'rgba(255,255,255,0.05)'
                 : 'linear-gradient(135deg, #d4af37, #92670a)',
               border: 'none',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: isLoading || !inputText.trim() ? 'not-allowed' : 'pointer',
+              cursor: (isLoading || !inputText.trim() || !!pendingRoll) ? 'not-allowed' : 'pointer',
               transition: 'all 0.2s',
               flexShrink: 0,
             }}
