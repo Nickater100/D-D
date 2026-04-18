@@ -8,7 +8,7 @@ import { STARTER_SPELLS } from '../data/spells_es';
 import { getAIProvider } from '../services/ai';
 import type { ChatMessage } from '../services/ai';
 import { extractRollRequest, rollDice } from '../utils/diceUtils';
-import type { RollResult } from '../utils/diceUtils';
+import type { RollResult, RollRequest } from '../utils/diceUtils';
 
 // ─── AI Service (Now handled via .env) ───────────────────────────────────────
 
@@ -91,32 +91,71 @@ const D20Die = ({ isRolling, result }: { isRolling: boolean; result: number | nu
 );
 
 // ─── Dice Roller Overlay ─────────────────────────────────────────────────────
-const DiceOverlay = ({ formula, isRolling, result, onRoll }: any) => (
-  <div style={{
-    position: 'absolute', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
-    width: '90%', maxWidth: '400px', background: 'rgba(8, 8, 20, 0.95)',
-    border: '1px solid var(--accent-gold)', borderRadius: '16px',
-    padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.8), 0 0 20px rgba(212,175,55,0.1)',
-    zIndex: 30, animation: 'slideUp 0.3s ease-out'
-  }}>
-    <div style={{ textAlign: 'center' }}>
-      <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 4px' }}>Tirada Requerida</p>
-      <h3 style={{ margin: 0, color: 'var(--accent-gold)', fontSize: '20px', fontFamily: 'var(--font-display)' }}>{formula}</h3>
+const DiceOverlay = ({ rollRequest, isRolling, result, onRoll }: any) => {
+  const getStatusColor = () => {
+    if (!result) return 'var(--accent-gold)';
+    if (result.isCritical) return '#fbbf24'; // Intense gold
+    if (result.isFumble) return '#ef4444'; // Bright red
+    if (result.isSuccess === true) return '#4ade80'; // Green
+    if (result.isSuccess === false) return '#f87171'; // Red
+    return 'var(--accent-gold)';
+  };
+
+  const color = getStatusColor();
+
+  return (
+    <div style={{
+      position: 'absolute', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
+      width: '90%', maxWidth: '400px', background: 'rgba(8, 8, 20, 0.98)',
+      border: `2px solid ${color}`, borderRadius: '16px',
+      padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px',
+      boxShadow: `0 10px 40px rgba(0,0,0,0.9), 0 0 30px ${color}22`,
+      zIndex: 30, animation: 'slideUp 0.3s ease-out',
+      transition: 'border-color 0.4s, box-shadow 0.4s'
+    }}>
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.2em', margin: '0 0 6px' }}>
+          {rollRequest.dc ? `OBJETIVO CD: ${rollRequest.dc}` : 'TIRADA REQUERIDA'}
+        </p>
+        <h3 style={{ margin: 0, color: 'white', fontSize: '24px', fontFamily: 'var(--font-display)' }}>
+          {rollRequest.formula}
+        </h3>
+      </div>
+      
+      <div style={{ 
+        transform: result?.isFumble ? 'translateX(0px)' : 'none',
+        animation: result?.isFumble ? 'shake 0.4s ease-in-out' : 'none'
+      }}>
+        <D20Die isRolling={isRolling} result={result?.dice} />
+      </div>
+
+      <div style={{ textAlign: 'center', height: '24px' }}>
+        {result && (
+          <p style={{ 
+            margin: 0, color, fontWeight: 'bold', fontSize: '16px', 
+            letterSpacing: '0.1em', animation: 'fadeIn 0.3s' 
+          }}>
+            {result.isCritical ? '¡CRÍTICO!' : (result.isFumble ? '¡PIFIA!' : (result.isSuccess ? '¡ÉXITO!' : (result.isSuccess === false ? 'FALLO' : '')))}
+          </p>
+        )}
+      </div>
+      
+      <button 
+        className="btn-primary" 
+        onClick={onRoll} 
+        disabled={isRolling || !!result}
+        style={{ 
+          width: '100%', padding: '14px', 
+          background: result ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #d4af37, #92670a)',
+          color: result ? 'var(--text-muted)' : 'black',
+          opacity: isRolling ? 0.7 : 1 
+        }}
+      >
+        {isRolling ? 'LANZANDO...' : (result ? 'COMPLETADO' : 'LANZAR DADO')}
+      </button>
     </div>
-    
-    <D20Die isRolling={isRolling} result={result?.dice} />
-    
-    <button 
-      className="btn-primary" 
-      onClick={onRoll} 
-      disabled={isRolling}
-      style={{ width: '100%', padding: '12px', opacity: isRolling ? 0.7 : 1 }}
-    >
-      {isRolling ? 'LANZANDO...' : 'LANZAR DADO'}
-    </button>
-  </div>
-);
+  );
+};
 
 // ─── System Message Bubble ───────────────────────────────────────────────────
 const SystemBubble = React.memo(({ text }: { text: string }) => (
@@ -151,7 +190,7 @@ export default function AdventureView() {
   const [streamingText, setStreamingText] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingRoll, setPendingRoll] = useState<string | null>(null);
+  const [pendingRoll, setPendingRoll] = useState<RollRequest | null>(null);
   const [isRolling, setIsRolling] = useState(false);
   const [rollResult, setRollResult] = useState<RollResult | null>(null);
 
@@ -211,9 +250,9 @@ export default function AdventureView() {
       setStreamingText('');
 
       // Check for pending roll
-      const rollFormula = extractRollRequest(fullResponse);
-      if (rollFormula) {
-        setPendingRoll(rollFormula);
+      const rollReq = extractRollRequest(fullResponse);
+      if (rollReq) {
+        setPendingRoll(rollReq);
       }
     } catch (err: any) {
       console.error('AI error:', err);
@@ -243,7 +282,7 @@ export default function AdventureView() {
     // Wait for display
     await new Promise(r => setTimeout(r, 1000));
     
-    const resultText = `Tirada realizada para [${result.formula}]. Resultado: ${result.total} (${result.dice} + ${result.modifier})`;
+    const resultText = `Tirada realizada para [${result.formula}${result.dc ? ` | CD: ${result.dc}` : ''}]. Resultado: ${result.total} (${result.dice} + ${result.modifier})${result.isSuccess !== undefined ? (result.isSuccess ? ' - ¡ÉXITO!' : ' - FALLO') : ''}`;
     addMessage({ role: 'system', text: resultText });
     
     setPendingRoll(null);
@@ -251,7 +290,13 @@ export default function AdventureView() {
     setRollResult(null);
 
     // Send the result to the AI automatically
-    sendMessage(`[SISTEMA: El jugador ha realizado la tirada solicitada. Resultado: ${result.total} (${result.dice} + ${result.modifier})]`);
+    const systemMsg = result.isCritical 
+      ? `[SISTEMA: ¡CRÍTICO NATURAL! El jugador ha sacado un 20. Total: ${result.total}. Éxito automático.]`
+      : result.isFumble
+      ? `[SISTEMA: ¡PIFIA NATURAL! El jugador ha sacado un 1. Total: ${result.total}. Fracaso automático.]`
+      : `[SISTEMA: Tirada realizada. Resultado: ${result.total} (${result.dice} + ${result.modifier})${result.dc ? `. Objetivo CD: ${result.dc}. ${result.isSuccess ? 'ÉXITO' : 'FRACASO'}` : ''}]`;
+
+    sendMessage(systemMsg);
   };
 
   // ─── Start session on mount ───────────────────────────────────────────────
@@ -306,6 +351,8 @@ export default function AdventureView() {
       <style>{`
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
         @keyframes slideUp { from{transform: translateX(-50%) translateY(20px); opacity:0} to{transform: translateX(-50%) translateY(0); opacity:1} }
+        @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
       `}</style>
 
 
@@ -466,7 +513,7 @@ export default function AdventureView() {
       {/* ─── DICE OVERLAY ────────────────────────────────────────────────── */}
       {pendingRoll && (
         <DiceOverlay 
-          formula={pendingRoll} 
+          rollRequest={pendingRoll} 
           isRolling={isRolling} 
           result={rollResult}
           onRoll={handleRoll}
