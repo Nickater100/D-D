@@ -1,15 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send, Sword, Wand2, Zap, RotateCcw, ChevronRight, ChevronLeft, Scroll } from 'lucide-react';
-import { GoogleGenAI } from '@google/genai';
 import { useRoster } from '../store/useRoster';
 import { useGameSession } from '../store/useGameSession';
 import { buildSystemPrompt } from '../data/dmPrompt';
 import { STARTER_SPELLS } from '../data/spells_es';
+import { getAIProvider } from '../services/ai';
+import type { ChatMessage } from '../services/ai';
 
-// ─── Gemini client (key from .env.local) ─────────────────────────────────────
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string;
-const MODEL = 'gemini-2.0-flash';
+// ─── AI Service (Now handled via .env) ───────────────────────────────────────
 
 // ─── Dice Roll Tag Parser ─────────────────────────────────────────────────────
 function parseDiceTag(text: string) {
@@ -96,13 +95,9 @@ export default function AdventureView() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingText]);
 
-  // ─── Send to Gemini ───────────────────────────────────────────────────────
-  const sendToGemini = useCallback(async (userText: string | null, isOpening = false) => {
+  // ─── Send to AI ────────────────────────────────────────────────────────────
+  const sendMessage = useCallback(async (userText: string | null, isOpening = false) => {
     if (!character) return;
-    if (!API_KEY || API_KEY === 'undefined') {
-      setError('⚠️ No se encontró la API Key. Verifica tu archivo .env.local (VITE_GEMINI_API_KEY).');
-      return;
-    }
 
     setError(null);
     setLoading(true);
@@ -113,40 +108,41 @@ export default function AdventureView() {
     }
 
     try {
-      const ai = new GoogleGenAI({ apiKey: API_KEY });
+      const ai = getAIProvider();
 
-      // Build conversation history for Gemini
-      const history = messages
+      const history: ChatMessage[] = messages
         .filter(m => !isOpening)
         .map(m => ({
           role: m.role as 'user' | 'model',
-          parts: [{ text: m.text }],
+          text: m.text,
         }));
 
-      const chat = ai.chats.create({
-        model: MODEL,
-        config: { systemInstruction: buildSystemPrompt(character) },
-        history,
-      });
-
-      const prompt = isOpening
+      const systemPrompt = buildSystemPrompt(character);
+      const promptText = isOpening
         ? 'Comienza la aventura con una apertura épica.'
         : userText ?? '';
 
-      const stream = await chat.sendMessageStream({ message: prompt });
+      // Prepare context for the provider (history + current message)
+      const currentMessages: ChatMessage[] = [...history, { role: 'user', text: promptText }];
+
+      const stream = await ai.sendMessageStream(currentMessages, systemPrompt);
 
       let fullResponse = '';
       for await (const chunk of stream) {
-        const chunkText = chunk.text ?? '';
-        fullResponse += chunkText;
+        fullResponse += chunk;
         setStreamingText(fullResponse);
       }
 
       addMessage({ role: 'model', text: fullResponse });
       setStreamingText('');
     } catch (err: any) {
-      console.error('Gemini error:', err);
-      setError(`Error del Narrador: ${err?.message ?? 'Algo salió mal. Intenta de nuevo.'}`);
+      console.error('AI error:', err);
+      const isConfigError = err.message?.includes('Configuración incompleta');
+      const msg = isConfigError 
+        ? `⚠️ Error de Configuración: Verifica tu archivo .env.local. Asegúrate de tener VITE_AI_API_KEY y VITE_AI_PROVIDER configurados.`
+        : `Error del Narrador: ${err?.message ?? 'Algo salió mal. Intenta de nuevo.'}`;
+      
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -157,7 +153,7 @@ export default function AdventureView() {
     if (!character || sessionStarted.current) return;
     sessionStarted.current = true;
     startSession(character.id);
-    sendToGemini(null, true);
+    sendMessage(null, true);
   }, [character]);
 
   // ─── Handle player send ───────────────────────────────────────────────────
@@ -165,7 +161,7 @@ export default function AdventureView() {
     const text = inputText.trim();
     if (!text || isLoading) return;
     setInputText('');
-    sendToGemini(text, false);
+    sendMessage(text, false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -178,7 +174,7 @@ export default function AdventureView() {
     setTimeout(() => {
       sessionStarted.current = true;
       startSession(character!.id);
-      sendToGemini(null, true);
+      sendMessage(null, true);
     }, 100);
   };
 
