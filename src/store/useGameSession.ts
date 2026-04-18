@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 export interface ChatMessage {
   role: 'user' | 'model' | 'system';
@@ -6,33 +7,108 @@ export interface ChatMessage {
   timestamp: number;
 }
 
-interface GameSessionState {
+export interface GameSession {
+  id: string;
+  name: string;
+  characterId: string;
+  moduleId: string | null;
   messages: ChatMessage[];
-  isLoading: boolean;
-  sessionCharacterId: string | null;
-  activeModuleId: string | null;
-  addMessage: (msg: Omit<ChatMessage, 'timestamp'>) => void;
-  setLoading: (v: boolean) => void;
-  startSession: (characterId: string, moduleId?: string | null) => void;
-  clearSession: () => void;
+  updatedAt: number;
 }
 
-export const useGameSession = create<GameSessionState>((set) => ({
-  messages: [],
-  isLoading: false,
-  sessionCharacterId: null,
-  activeModuleId: null,
+interface GameSessionState {
+  sessions: Record<string, GameSession>;
+  currentSessionId: string | null;
+  isLoading: boolean;
+  
+  // Actions
+  createSession: (characterName: string, characterId: string, moduleTitle: string, moduleId: string | null) => string | null;
+  resumeSession: (sessionId: string) => void;
+  deleteSession: (sessionId: string) => void;
+  addMessage: (msg: Omit<ChatMessage, 'timestamp'>) => void;
+  setLoading: (v: boolean) => void;
+  clearCurrentSession: () => void;
+}
 
-  addMessage: (msg) =>
-    set((state) => ({
-      messages: [...state.messages, { ...msg, timestamp: Date.now() }],
-    })),
+export const useGameSession = create<GameSessionState>()(
+  persist(
+    (set, get) => ({
+      sessions: {},
+      currentSessionId: null,
+      isLoading: false,
 
-  setLoading: (v) => set({ isLoading: v }),
+      createSession: (characterName, characterId, moduleTitle, moduleId) => {
+        const sessions = get().sessions;
+        const sessionCount = Object.keys(sessions).length;
 
-  startSession: (characterId, moduleId = null) =>
-    set({ sessionCharacterId: characterId, activeModuleId: moduleId, messages: [], isLoading: false }),
+        if (sessionCount >= 5) {
+          return null;
+        }
 
-  clearSession: () =>
-    set({ messages: [], isLoading: false, sessionCharacterId: null }),
-}));
+        const id = typeof crypto.randomUUID === 'function' 
+          ? crypto.randomUUID() 
+          : Math.random().toString(36).substring(2, 15);
+        const date = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+        const name = `${characterName} en ${moduleTitle} - ${date}`;
+
+        const newSession: GameSession = {
+          id,
+          name,
+          characterId,
+          moduleId,
+          messages: [],
+          updatedAt: Date.now()
+        };
+
+        set((state) => ({
+          sessions: { ...state.sessions, [id]: newSession },
+          currentSessionId: id
+        }));
+
+        return id;
+      },
+
+      resumeSession: (sessionId) => {
+        set({ currentSessionId: sessionId });
+      },
+
+      deleteSession: (sessionId) => {
+        set((state) => {
+          const newSessions = { ...state.sessions };
+          delete newSessions[sessionId];
+          return {
+            sessions: newSessions,
+            currentSessionId: state.currentSessionId === sessionId ? null : state.currentSessionId
+          };
+        });
+      },
+
+      addMessage: (msg) => {
+        const currentId = get().currentSessionId;
+        if (!currentId) return;
+
+        set((state) => {
+          const session = state.sessions[currentId];
+          if (!session) return state;
+
+          const updatedSession: GameSession = {
+            ...session,
+            messages: [...session.messages, { ...msg, timestamp: Date.now() }],
+            updatedAt: Date.now()
+          };
+
+          return {
+            sessions: { ...state.sessions, [currentId]: updatedSession }
+          };
+        });
+      },
+
+      setLoading: (v) => set({ isLoading: v }),
+
+      clearCurrentSession: () => set({ currentSessionId: null, isLoading: false }),
+    }),
+    {
+      name: 'dnd-ai-master-sessions',
+    }
+  )
+);

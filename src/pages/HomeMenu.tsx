@@ -1,9 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, Users, Settings } from 'lucide-react';
+import { BookOpen, Users, Settings, Scroll } from 'lucide-react';
+import { useGameSession } from '../store/useGameSession';
 
 export default function HomeMenu() {
   const navigate = useNavigate();
+  const { sessions } = useGameSession();
+  const sessionCount = Object.keys(sessions).length;
 
   return (
     <div className="container flex-col items-center justify-center h-full animate-fade-in" style={{ minHeight: '100vh' }}>
@@ -19,6 +22,26 @@ export default function HomeMenu() {
         >
           <BookOpen size={20} />
           EXPLORAR HISTORIAS
+        </button>
+
+        <button 
+          className="btn-secondary flex items-center justify-center gap-2" 
+          onClick={() => navigate('/my-adventures')}
+          style={{ position: 'relative' }}
+        >
+          <Scroll size={20} />
+          MIS AVENTURAS
+          {sessionCount > 0 && (
+            <span style={{ 
+              position: 'absolute', top: '-5px', right: '-5px',
+              background: 'var(--accent-gold)', color: 'black',
+              borderRadius: '50%', width: '20px', height: '20px',
+              fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 'bold', boxShadow: '0 0 10px rgba(212,175,55,0.5)'
+            }}>
+              {sessionCount}
+            </span>
+          )}
         </button>
 
         <div style={{ height: '1px', background: 'var(--glass-border)', margin: '1rem 0' }}></div>

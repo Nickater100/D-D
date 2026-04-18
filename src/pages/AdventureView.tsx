@@ -185,7 +185,11 @@ const SystemBubble = React.memo(({ text }: { text: string }) => (
 export default function AdventureView() {
   const navigate = useNavigate();
   const { characters, activeCharacterId } = useRoster();
-  const { messages, isLoading, addMessage, setLoading, startSession, clearSession, activeModuleId } = useGameSession();
+  const { sessions, currentSessionId, isLoading, addMessage, setLoading, clearCurrentSession } = useGameSession();
+
+  const currentSession = currentSessionId ? sessions[currentSessionId] : null;
+  const messages = currentSession?.messages || [];
+  const activeModuleId = currentSession?.moduleId;
 
   const [inputText, setInputText] = useState('');
   const [streamingText, setStreamingText] = useState('');
@@ -331,10 +335,9 @@ export default function AdventureView() {
   const handleRestart = () => {
     if (!character) return;
     sessionStarted.current = false;
-    clearSession();
+    clearCurrentSession();
     setTimeout(() => {
-      sessionStarted.current = true;
-      startSession(character.id, activeModuleId);
+      navigate('/campaigns'); // Go back to library on restart to be safe, or just clear.
     }, 100);
   };
 

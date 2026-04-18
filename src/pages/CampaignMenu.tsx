@@ -8,13 +8,26 @@ import { ADVENTURE_MODULES } from '../data/adventures';
 export default function CampaignMenu() {
   const navigate = useNavigate();
   const { activeCharacterId, characters } = useRoster();
-  const { startSession } = useGameSession();
+  const { createSession } = useGameSession();
 
   const activeChar = characters.find(c => c.id === activeCharacterId);
 
   const startModule = (moduleId: string) => {
     if (!activeChar) return;
-    startSession(activeChar.id, moduleId);
+    
+    const mod = ADVENTURE_MODULES.find(m => m.id === moduleId);
+    const sessionId = createSession(
+      activeChar.name, 
+      activeChar.id, 
+      mod?.title || 'Aventura', 
+      moduleId
+    );
+
+    if (!sessionId) {
+      alert('⚠️ Has alcanzado el límite de 5 aventuras guardadas. Por favor, elimina una partida en "Mis Aventuras" para comenzar una nueva.');
+      return;
+    }
+
     navigate('/adventure');
   };
 
