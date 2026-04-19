@@ -172,7 +172,21 @@ export const SRD_RACES: Record<string, RaceDefinition> = {
     abilityBonuses: { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 },
     languages: ['Común'],
     flexibleLanguageCount: 1,
-    traits: []
+    traits: [],
+    subraces: [
+      {
+        id: 'human_variant',
+        name: 'Humano Variante',
+        description: 'Capacidad de adaptación extrema. Sacrificas el +1 a todas las estadísticas por una Dote de inicio y una habilidad extra.',
+        abilityBonuses: {}, // Handled via flexibleAbilityCount
+        flexibleAbilityCount: 2,
+        flexibleSkillCount: 1,
+        traits: [
+          { name: 'Dote Inicial', description: 'Obtienes una dote de tu elección al nivel 1.' },
+          { name: 'Versatilidad con Habilidades', description: 'Ganas competencia en una habilidad de tu elección.' }
+        ]
+      }
+    ]
   },
   dragonborn: {
     id: 'dragonborn',

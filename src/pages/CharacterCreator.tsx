@@ -11,6 +11,7 @@ import { SRD_CLASSES } from '../data/srd/classes';
 import { SRD_SKILLS } from '../data/srd/skills';
 import { SRD_ALIGNMENTS } from '../data/srd/alignments';
 import { SRD_EQUIPMENT } from '../data/srd/equipment';
+import { SRD_FEATS } from '../data/srd/feats';
 import { ErrorBoundary } from '../components/CharacterCreatorComponents';
 import { calculateModifier, calculateAC } from '../utils/statsUtils';
 
@@ -61,6 +62,7 @@ export default function CharacterCreator() {
   const [assignedStats, setAssignedStats] = useState<Record<AbilityKey, number>>({
     str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8
   });
+  const [selectedFeat, setSelectedFeat] = useState<string>('');
 
   const getRacialBonus = (stat: AbilityKey) => {
     if (!selectedRace) return 0;
@@ -227,11 +229,15 @@ export default function CharacterCreator() {
 
     // Create a temporary character object to use with calculateAC
     const tempChar: any = {
-      className: selectedClass.name,
-      subclass: selectedSubclass?.name,
+      classes: [{
+        classId: selectedClass.id,
+        name: selectedClass.name,
+        level: 1,
+        subclass: selectedSubclass?.name
+      }],
       attributes: finalStats,
       inventory,
-      equipment: {}, // Initial equipment is empty, but calculateAC checks inventory if armor is found
+      equipment: {}, 
       features: extraFeatures
     };
     
@@ -247,8 +253,7 @@ export default function CharacterCreator() {
       id: crypto.randomUUID(),
       name: charName,
       race: selectedSubrace ? selectedSubrace.name : selectedRace.name,
-      className: selectedClass.name,
-      subclass: selectedSubclass?.name,
+      classes: tempChar.classes,
       spells: [...selectedCantrips, ...selectedLvl1],
       level: 1,
       hp: selectedClass.hitDie + calculateModifier(finalStats.con),
@@ -258,7 +263,7 @@ export default function CharacterCreator() {
       background: selectedBackground.name,
       alignment: selectedAlignment as any,
       portraitUrl: selectedRace.image || 'https://images.unsplash.com/photo-1519077336822-4217316719cd?q=80&w=400&fit=crop',
-      feats: [],
+      feats: selectedFeat ? [selectedFeat] : [],
       features: [...racialFeatures, ...backgroundFeatures, ...extraFeatures],
       
       // Real mechanics mapped from DB
@@ -524,6 +529,24 @@ export default function CharacterCreator() {
                                   </button>
                                 );
                               })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* FEAT SELECTION (Human Variant) */}
+                        {selectedSubrace?.id === 'human_variant' && (
+                          <div className="p-3 bg-black/40 border border-yellow-500/30 rounded animate-fade-in">
+                            <h4 className="font-display text-yellow-300 text-sm mb-1">Dote de Inicio</h4>
+                            <p className="text-xs text-secondary mb-3">Selecciona tu capacidad especial inicial.</p>
+                            <div className="grid grid-cols-2 gap-2">
+                               {Object.values(SRD_FEATS).map(feat => (
+                                 <button key={feat.id}
+                                   onClick={() => setSelectedFeat(feat.id)}
+                                   className={`px-3 py-2 rounded text-xs text-left transition-all ${selectedFeat === feat.id ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-400' : 'bg-white/5 border border-white/10 hover:bg-white/10'}`}>
+                                   <div className="font-bold">{feat.name}</div>
+                                   <div className="text-[10px] opacity-60 line-clamp-1">{feat.description}</div>
+                                 </button>
+                               ))}
                             </div>
                           </div>
                         )}

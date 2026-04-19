@@ -60,7 +60,7 @@ export default function CampaignMenu() {
         <div className="glass-panel">
           <p className="text-center" style={{ margin: '1rem', color: 'var(--text-secondary)' }}>
             Héroe Seleccionado: <strong className="text-gold font-display text-xl">{activeChar.name}</strong> 
-            <span className="text-muted"> (Nivel {activeChar.level} {activeChar.className})</span>
+            <span className="text-muted"> (Nivel {activeChar.level} {activeChar.classes.map(c => `${c.name} ${c.level}`).join(' / ')})</span>
           </p>
         </div>
       )}

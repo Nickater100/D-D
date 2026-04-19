@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Character, Item } from '../types/dnd';
 import { calculateAC } from '../utils/statsUtils';
+import { getMulticlassSpellSlots } from '../utils/multiclassUtils';
 
 interface RosterState {
   characters: Character[];
@@ -16,6 +17,7 @@ interface RosterState {
   addXp: (charId: string, amount: number) => void;
   addFeatureToCharacter: (charId: string, feature: any) => void;
   levelUp: (charId: string) => void;
+  addMulticlassLevel: (charId: string, classId: string, className: string) => void;
   setActiveCharacter: (id: string | null) => void;
 }
 
@@ -165,20 +167,65 @@ export const useRoster = create<RosterState>()(
       set((state) => ({
         characters: state.characters.map((c) => {
           if (c.id !== charId) return c;
+          
+          // Increment first class level (default behavior)
+          const updatedClasses = [...c.classes];
+          if (updatedClasses[0]) {
+            updatedClasses[0].level += 1;
+          }
+
           const nextLevel = c.level + 1;
-          const hpGain = Math.floor(Math.random() * 8) + 3; // Simplified HP gain
-          return {
+          const hpGain = Math.floor(Math.random() * 8) + 3;
+
+          const { shared, warlock } = getMulticlassSpellSlots(updatedClasses);
+
+          const updatedChar: Character = {
             ...c,
+            classes: updatedClasses,
             level: nextLevel,
             maxHp: c.maxHp + hpGain,
-            hp: c.maxHp + hpGain
+            hp: c.maxHp + hpGain,
+            spellSlots: shared,
+            warlockSlots: warlock
           };
+          return updatedChar;
         }),
+      })),
+    addMulticlassLevel: (charId, classId, className) =>
+      set((state) => ({
+        characters: state.characters.map((c) => {
+          if (c.id !== charId) return c;
+          
+          const updatedClasses = [...c.classes];
+          const existing = updatedClasses.find(cl => cl.classId === classId);
+          
+          if (existing) {
+            existing.level += 1;
+          } else {
+            updatedClasses.push({ classId, name: className, level: 1 });
+          }
+
+          const nextLevel = c.level + 1;
+          const hpGain = 5; // Simplified for multiclass
+          
+          const { shared, warlock } = getMulticlassSpellSlots(updatedClasses);
+
+          const updatedChar: Character = {
+            ...c,
+            classes: updatedClasses,
+            level: nextLevel,
+            maxHp: c.maxHp + hpGain,
+            hp: c.maxHp + hpGain,
+            spellSlots: shared,
+            warlockSlots: warlock
+          };
+          return updatedChar;
+        })
       })),
     setActiveCharacter: (id) => set({ activeCharacterId: id }),
     }),
     {
-      name: 'dnd-roster-storage',
+      name: 'dnd-roster-storage-v2',
     }
   )
 );

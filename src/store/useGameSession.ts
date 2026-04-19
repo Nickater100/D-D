@@ -108,7 +108,7 @@ export const useGameSession = create<GameSessionState>()(
       clearCurrentSession: () => set({ currentSessionId: null, isLoading: false }),
     }),
     {
-      name: 'dnd-ai-master-sessions',
+      name: 'dnd-ai-master-sessions-v2',
     }
   )
 );

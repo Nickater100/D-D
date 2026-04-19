@@ -64,12 +64,18 @@ export interface Item {
   quantity?: number;
 }
 
+export interface CharacterClass {
+  classId: string;
+  name: string;
+  level: number;
+  subclass?: string;
+}
+
 export interface Character {
   id: string;
   name: string;
   race: string;
-  className: string;
-  subclass?: string;
+  classes: CharacterClass[];
   level: number;
   hp: number;
   maxHp: number;
@@ -91,6 +97,8 @@ export interface Character {
   // Features, Spells & Feats
   feats?: string[]; // list of feat IDs
   spells?: string[]; // list of spell IDs
+  spellSlots?: Record<number, number>; // Shared slots
+  warlockSlots?: { count: number, level: number }; // Pact Magic
   features?: Feature[]; // Used for both class features and narrative consequences
   
   // Inventory

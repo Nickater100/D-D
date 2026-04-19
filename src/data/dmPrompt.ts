@@ -60,7 +60,7 @@ FICHA DEL HÉROE
 ══════════════════════════════════
 Nombre:       ${character.name}
 Raza:         ${character.race}
-Clase:        ${character.className}${character.subclass ? ` (${character.subclass})` : ''}
+Clase:        ${character.classes.map(c => `${c.name} ${c.level}${c.subclass ? ` (${c.subclass})` : ''}`).join(' / ')}
 Trasfondo:    ${character.background}
 HP Máximo:    ${character.maxHp}
 Clase Armad.: ${character.ac}

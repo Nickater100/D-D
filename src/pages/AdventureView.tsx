@@ -12,6 +12,7 @@ import type { RollResult, RollRequest } from '../utils/diceUtils';
 import { ADVENTURE_MODULES } from '../data/adventures';
 import { extractItemsFromText, cleanItemTags, extractXpFromText, extractFeaturesFromText } from '../utils/itemUtils';
 import { ShoppingBag, Sword as SwordIcon, Package, Trash, Shield, ShieldQuestion, Gem, CircleDot, Footprints, Hand, Shirt, HardHat, Waypoints } from 'lucide-react';
+import { SRD_FEATS } from '../data/srd/feats';
 
 // ─── AI Service (Now handled via .env) ───────────────────────────────────────
 
@@ -286,7 +287,9 @@ export default function AdventureView() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '12px', fontWeight: 'bold' }}>{character?.name}</div>
-            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>LVL {character?.level} {character?.className}</div>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+              LVL {character?.level} {character?.classes.map(c => `${c.name} ${c.level}`).join(' / ')}
+            </div>
           </div>
           <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--accent-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'black' }}>
             <SwordIcon size={18} />
@@ -382,7 +385,9 @@ export default function AdventureView() {
                 <div>
                   <div style={{ fontSize: '10px', color: 'var(--accent-gold)', letterSpacing: '2px', fontWeight: 'bold' }}>HÉROE DE NIVEL {character?.level}</div>
                   <h1 style={{ fontSize: '36px', margin: '0', fontFamily: 'var(--font-display)', color: 'white' }}>{character?.name}</h1>
-                  <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>{character?.race} {character?.className} {character?.subclass && `(${character.subclass})`}</div>
+                  <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
+                    {character?.race} — {character?.classes.map(c => `${c.name} ${c.level}${c.subclass ? ` (${c.subclass})` : ''}`).join(' / ')}
+                  </div>
                 </div>
                 
                 {/* Level Up Button */}
@@ -471,8 +476,47 @@ export default function AdventureView() {
                     {!character?.features?.length && <div style={{ opacity: 0.3, fontSize: '12px' }}>Ningún rasgo activo.</div>}
                   </div>
                 </div>
+
+                {/* DOTES (FEATS) SECTION (Cap. 6) */}
+                {character?.feats && character.feats.length > 0 && (
+                  <div style={{ marginTop: '30px' }}>
+                    <p style={{ fontSize: '10px', color: 'var(--accent-gold)', letterSpacing: '1px', marginBottom: '15px', fontWeight: 'bold' }}>DOTES</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {character.feats.map(featId => {
+                        const feat = SRD_FEATS[featId];
+                        return (
+                          <div key={featId} className="glass-panel" style={{ padding: '14px', borderLeft: '3px solid #fbbf24', background: 'rgba(251,191,36,0.05)' }}>
+                            <div style={{ fontSize: '14px', fontWeight: 'bold', color: 'white', marginBottom: '4px' }}>{feat?.name || featId}</div>
+                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>{feat?.description}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* ESPACIOS DE CONJURO (Cap. 6) */}
+            {(character?.spellSlots || character?.warlockSlots) && (
+              <div>
+                <p style={{ fontSize: '10px', color: 'var(--accent-gold)', letterSpacing: '1px', marginBottom: '15px', fontWeight: 'bold' }}>ESPACIOS DE CONJURO</p>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  {character.spellSlots && Object.entries(character.spellSlots).map(([lvl, count]) => (
+                    <div key={`slot-${lvl}`} className="glass-panel" style={{ padding: '10px 20px', textAlign: 'center', border: '1px solid rgba(167,139,250,0.3)' }}>
+                      <div style={{ fontSize: '8px', color: '#a78bfa' }}>NIVEL {lvl}</div>
+                      <div style={{ fontSize: '18px' }}>{count}</div>
+                    </div>
+                  ))}
+                  {character.warlockSlots && (
+                    <div className="glass-panel" style={{ padding: '10px 20px', textAlign: 'center', border: '1px solid rgba(236, 72, 153, 0.4)', background: 'rgba(236, 72, 153, 0.05)' }}>
+                      <div style={{ fontSize: '8px', color: '#f472b6' }}>PACTO (Lvl {character.warlockSlots.level})</div>
+                      <div style={{ fontSize: '18px' }}>{character.warlockSlots.count}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* SPELLBOOK SECTION */}
             {charSpells.length > 0 && (

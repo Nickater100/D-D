@@ -42,15 +42,15 @@ export function calculateAC(character: Character): number {
       baseAC = armor.acBase; // Heavy armor ignores Dex
     }
   } else {
-    // Unarmored features
-    const className = character.className; // e.g. "Bárbaro"
-    const subclass = character.subclass || '';
+    // Unarmored features (Cap. 3 & 6)
+    const hasClassName = (id: string) => character.classes.some(c => c.classId === id);
+    const subclass = character.classes[0]?.subclass || '';
 
-    if (className === 'Bárbaro') {
+    if (hasClassName('barbarian')) {
       baseAC = 10 + modDex + modCon;
-    } else if (className === 'Monje') {
+    } else if (hasClassName('monk')) {
       baseAC = 10 + modDex + modWis;
-    } else if (className === 'Hechicero' && subclass.includes('Dracónico')) {
+    } else if (hasClassName('sorcerer') && subclass.includes('Dracónico')) {
       baseAC = 13 + modDex;
     }
   }

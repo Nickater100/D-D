@@ -66,7 +66,9 @@ export default function CharacterRoster() {
                         <h3 className="font-display text-xl text-white">{char.name}</h3>
                         {isActive && <div className="w-2 h-2 rounded-full bg-gold animate-pulse"></div>}
                       </div>
-                      <p className="text-[10px] text-muted uppercase tracking-widest">{char.race} • {char.className} {char.subclass ? `(${char.subclass})` : ''}</p>
+                      <p className="text-[10px] text-muted uppercase tracking-widest">
+                        {char.race} • {char.classes.map(c => `${c.name} ${c.level}`).join(' / ')}
+                      </p>
                     </div>
                   </div>
                   
