@@ -1,6 +1,5 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Play, Map, Crown, Sparkles } from 'lucide-react';
+import { ArrowLeft, Play, Map, Sparkles, BookOpen } from 'lucide-react';
 import { useRoster } from '../store/useRoster';
 import { useGameSession } from '../store/useGameSession';
 import { ADVENTURE_MODULES } from '../data/adventures';

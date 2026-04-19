@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import HomeMenu from './pages/HomeMenu';
 import CharacterRoster from './pages/CharacterRoster';
 import CharacterCreator from './pages/CharacterCreator';

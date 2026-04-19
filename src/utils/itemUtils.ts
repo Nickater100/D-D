@@ -9,9 +9,6 @@ export function extractItemsFromText(text: string): Item[] {
   // Format: [ITEM: Name | Category | Subtype | Properties | Description]
   const regex = /\[ITEM:\s*([^|]+)\|\s*([^|]+)\|\s*([^|]+)\|\s*([^|]+)\|\s*([^\]]+)\]/gi;
   
-  // Fallback for old format if needed: [ITEM: Name | Category | Description]
-  const legacyRegex = /\[ITEM:\s*([^|]+)\|\s*([^|]+)\|\s*([^\]]+)\]/gi;
-
   let match;
   while ((match = regex.exec(text)) !== null) {
     const [, name, category, subtype, properties, description] = match;

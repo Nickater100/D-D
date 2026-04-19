@@ -15,7 +15,7 @@ export abstract class AIProvider {
   abstract sendMessageStream(
     messages: ChatMessage[],
     systemPrompt: string
-  ): Promise<AsyncIterable<string>>;
+  ): AsyncGenerator<string, void, unknown>;
 }
 
 // ─── Gemini Provider ──────────────────────────────────────────────────────────
@@ -25,29 +25,29 @@ export class GeminiProvider extends AIProvider {
 
   constructor(config: AIProviderConfig) {
     super();
-    this.genAI = new GoogleGenAI(config.apiKey);
+    this.genAI = new GoogleGenAI({ apiKey: config.apiKey });
     this.model = config.model;
   }
 
   async *sendMessageStream(
     messages: ChatMessage[],
     systemPrompt: string
-  ): Promise<AsyncIterable<string>> {
-    const chat = this.genAI.getGenerativeModel({
+  ): AsyncGenerator<string, void, unknown> {
+    const stream = await this.genAI.models.generateContentStream({
       model: this.model,
-      systemInstruction: systemPrompt,
-    }).startChat({
-      history: messages.slice(0, -1).map(m => ({
-        role: m.role === 'model' ? 'model' : 'user',
+      contents: messages.map(m => ({
+        role: m.role,
         parts: [{ text: m.text }],
       })),
+      config: {
+        systemInstruction: systemPrompt,
+      }
     });
 
-    const lastMessage = messages[messages.length - 1]?.text || '';
-    const result = await chat.sendMessageStream(lastMessage);
-
-    for await (const chunk of result.stream) {
-      yield chunk.text();
+    for await (const chunk of stream) {
+      if (chunk.text) {
+        yield chunk.text;
+      }
     }
   }
 }
@@ -68,7 +68,7 @@ export class OpenAIProvider extends AIProvider {
   async *sendMessageStream(
     messages: ChatMessage[],
     systemPrompt: string
-  ): Promise<AsyncIterable<string>> {
+  ): AsyncGenerator<string, void, unknown> {
     const isOpenRouter = this.baseUrl.includes('openrouter.ai');
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {

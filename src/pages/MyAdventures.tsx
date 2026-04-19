@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameSession } from '../store/useGameSession';
 import { useRoster } from '../store/useRoster';
-import { ADVENTURE_MODULES } from '../data/adventures';
-import { ArrowLeft, Play, Trash2, Calendar, User, BookOpen, AlertCircle, X } from 'lucide-react';
+import { ArrowLeft, Play, Trash2, Calendar, User, BookOpen, AlertCircle } from 'lucide-react';
 
 export default function MyAdventures() {
   const navigate = useNavigate();
@@ -53,7 +52,6 @@ export default function MyAdventures() {
         <div className="flex-col gap-4">
           {sortedSessions.map((session) => {
             const char = characters.find(c => c.id === session.characterId);
-            const mod = ADVENTURE_MODULES.find(m => m.id === session.moduleId);
             const lastPlayed = new Date(session.updatedAt).toLocaleDateString('es-ES', { 
               day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
             });

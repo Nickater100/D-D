@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Sword, Wand2, Zap, RotateCcw, ChevronRight, ChevronLeft, Scroll } from 'lucide-react';
+import { ArrowLeft, Send, Sword, Wand2, Zap, Scroll } from 'lucide-react';
 import { useRoster } from '../store/useRoster';
 import { useGameSession } from '../store/useGameSession';
 import { buildSystemPrompt } from '../data/dmPrompt';
@@ -11,7 +11,7 @@ import { extractRollRequest, rollDice } from '../utils/diceUtils';
 import type { RollResult, RollRequest } from '../utils/diceUtils';
 import { ADVENTURE_MODULES } from '../data/adventures';
 import { extractItemsFromText, cleanItemTags, extractXpFromText, extractFeaturesFromText } from '../utils/itemUtils';
-import { ShoppingBag, Sword as SwordIcon, FlaskConical, Package, Trash, Shield, ShieldQuestion, Gem, CircleDot, Footprints, Hand, Shirt, HardHat, Waypoints } from 'lucide-react';
+import { ShoppingBag, Sword as SwordIcon, Package, Trash, Shield, ShieldQuestion, Gem, CircleDot, Footprints, Hand, Shirt, HardHat, Waypoints } from 'lucide-react';
 
 // ─── AI Service (Now handled via .env) ───────────────────────────────────────
 
@@ -26,7 +26,7 @@ const XP_LEVELS = [0, 0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000
 export default function AdventureView() {
   const navigate = useNavigate();
   const { characters, activeCharacterId } = useRoster();
-  const { sessions, currentSessionId, isLoading, addMessage, setLoading, clearCurrentSession } = useGameSession();
+  const { sessions, currentSessionId, isLoading, addMessage, setLoading } = useGameSession();
 
   const currentSession = currentSessionId ? sessions[currentSessionId] : null;
   const messages = currentSession?.messages || [];
@@ -34,7 +34,7 @@ export default function AdventureView() {
 
   const [inputText, setInputText] = useState('');
   const [streamingText, setStreamingText] = useState('');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // const [sidebarOpen, setSidebarOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingRoll, setPendingRoll] = useState<RollRequest | null>(null);
   const [isRolling, setIsRolling] = useState(false);
@@ -79,7 +79,7 @@ export default function AdventureView() {
       const ai = getAIProvider();
 
       const history: ChatMessage[] = messages
-        .filter(m => !isOpening)
+        .filter(_m => !isOpening)
         .map(m => ({
           role: m.role as 'user' | 'model',
           text: m.text,
@@ -214,14 +214,14 @@ export default function AdventureView() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-  const handleRestart = () => {
-    if (!character) return;
-    sessionStarted.current = false;
-    clearCurrentSession();
-    setTimeout(() => {
-      navigate('/campaigns');
-    }, 100);
-  };
+  // const handleRestart = () => {
+  //   if (!character) return;
+  //   sessionStarted.current = false;
+  //   clearCurrentSession();
+  //   setTimeout(() => {
+  //     navigate('/campaigns');
+  //   }, 100);
+  // };
 
   // ─── No active character guard ────────────────────────────────────────────
   if (!character) {
@@ -276,7 +276,7 @@ export default function AdventureView() {
               }}
             >
               {tab.icon} {tab.label}
-              {tab.id === 'inventario' && character?.inventory?.length > 0 && (
+              {tab.id === 'inventario' && character?.inventory && character.inventory.length > 0 && (
                 <span style={{ fontSize: '10px', opacity: 0.7 }}>({character.inventory.length})</span>
               )}
             </button>
@@ -702,10 +702,9 @@ const PlayerBubble = ({ text }: { text: string }) => (
   </div>
 );
 
-function ItemPickupAlert({ name, category, type }: { name: string; category?: string; type?: string }) {
+function ItemPickupAlert({ name, type }: { name: string; category?: string; type?: string }) {
   const isXp = type === 'XP';
   const isRasgo = type === 'RASGO';
-  const isObjeto = type === 'OBJETO';
 
   return (
     <div className="item-pickup-alert" style={{ 
@@ -763,7 +762,7 @@ function DiceOverlay({ rollRequest, isRolling, result, onRoll }: { rollRequest: 
             className="btn-primary" 
             onClick={onRoll} 
             disabled={isRolling}
-            style={{ width: '100%', py: '16px', fontSize: '18px' }}
+            style={{ width: '100%', paddingTop: '16px', paddingBottom: '16px', fontSize: '18px' }}
           >
             {isRolling ? 'Lanzando...' : 'LANZAR DADOS'}
           </button>

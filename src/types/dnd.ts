@@ -1,3 +1,6 @@
+import type { AbilityKey } from '../data/srd/skills';
+import type { AlignmentId } from '../data/srd/alignments';
+
 export interface AbilityScores {
   str: number;
   dex: number;
@@ -6,6 +9,14 @@ export interface AbilityScores {
   wis: number;
   cha: number;
 }
+
+export interface Proficiencies {
+  armor: string[];
+  weapons: string[];
+  tools: string[];
+  skills: string[]; // IDs from skills.ts
+}
+
 
 export interface Feat {
   id: string;
@@ -49,21 +60,33 @@ export interface Character {
   name: string;
   race: string;
   className: string;
+  subclass?: string;
   level: number;
   hp: number;
   maxHp: number;
-  ac: number; 
+  ac: number;
   attributes: AbilityScores;
   background: string;
-  alignment: string;
-  portraitUrl?: string; 
-  subclass?: string;
-  spells?: string[];
-  feats?: string[]; // List of feat IDs
-  features?: Feature[];
+  alignment: AlignmentId | 'Neutral'; // Standard 5e alignments
+  portraitUrl?: string; // e.g. path to generic class image
+
+  // Progression & Identifiers
+  xp?: number;
+  
+  // 5e Complex Mechanics
+  proficiencyBonus: number;
+  savingThrows: AbilityKey[];
+  proficiencies: Proficiencies;
+  languages: string[];
+
+  // Features, Spells & Feats
+  feats?: string[]; // list of feat IDs
+  spells?: string[]; // list of spell IDs
+  features?: Feature[]; // Used for both class features and narrative consequences
+  
+  // Inventory
   inventory?: Item[];
   equipment?: Partial<Record<EquipmentSlot, string>>; // Maps slot to Item ID
-  xp?: number;
 }
 
 export interface Campaign {

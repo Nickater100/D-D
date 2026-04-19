@@ -1,9 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRoster } from '../store/useRoster';
-import { Shield, Plus, ArrowLeft, Trash2, CheckCircle2, User, Wand2, Star, Zap, Activity } from 'lucide-react';
+import { Shield, Plus, ArrowLeft, Trash2, User, Wand2, Zap, Activity } from 'lucide-react';
 import { STARTER_SPELLS, } from '../data/spells_es';
-import { ORIGIN_FEATS } from '../data/feats_es';
 import { SRD_RACES } from '../data/srd_es';
 
 export default function CharacterRoster() {
