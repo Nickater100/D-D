@@ -28,6 +28,15 @@ export interface Feature {
   source: 'raza' | 'trasfondo' | 'clase' | 'otro';
 }
 
+export interface Item {
+  id: string;
+  name: string;
+  category: 'equipamiento' | 'consumible' | 'otro';
+  description: string;
+  rarity: 'común' | 'poco común' | 'raro' | 'muy raro' | 'legendario';
+  quantity?: number;
+}
+
 export interface Character {
   id: string;
   name: string;
@@ -45,6 +54,7 @@ export interface Character {
   spells?: string[];
   feats?: string[]; // List of feat IDs
   features?: Feature[];
+  inventory?: Item[];
 }
 
 export interface Campaign {

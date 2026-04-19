@@ -10,6 +10,8 @@ import type { ChatMessage } from '../services/ai';
 import { extractRollRequest, rollDice } from '../utils/diceUtils';
 import type { RollResult, RollRequest } from '../utils/diceUtils';
 import { ADVENTURE_MODULES } from '../data/adventures';
+import { extractItemsFromText, cleanItemTags } from '../utils/itemUtils';
+import { ShoppingBag, Sword as SwordIcon, FlaskConical, Package, Trash } from 'lucide-react';
 
 // ─── AI Service (Now handled via .env) ───────────────────────────────────────
 
@@ -203,6 +205,12 @@ export default function AdventureView() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const sessionStarted = useRef(false);
 
+  const [sidebarTab, setSidebarTab] = useState<'ficha' | 'inventario'>('ficha');
+  const [inventoryTab, setInventoryTab] = useState<'equipamiento' | 'consumible' | 'otro'>('equipamiento');
+  const [newItemsAlert, setNewItemsAlert] = useState<any[]>([]);
+
+  const { addItemToCharacter, removeItemFromCharacter } = useRoster();
+
   const character = characters.find(c => c.id === activeCharacterId);
   const activeModule = ADVENTURE_MODULES.find(m => m.id === activeModuleId);
 
@@ -253,8 +261,19 @@ export default function AdventureView() {
         setStreamingText(fullResponse);
       }
 
-      addMessage({ role: 'model', text: fullResponse });
+      addMessage({ role: 'model', text: cleanItemTags(fullResponse) });
       setStreamingText('');
+
+      // Check for items
+      const foundItems = extractItemsFromText(fullResponse);
+      if (foundItems.length > 0) {
+        foundItems.forEach(item => {
+          addItemToCharacter(character.id, item);
+          setNewItemsAlert(prev => [...prev, item]);
+        });
+        // Auto-clear alerts after 5s
+        setTimeout(() => setNewItemsAlert([]), 5000);
+      }
 
       // Check for pending roll
       const rollReq = extractRollRequest(fullResponse);
@@ -445,6 +464,12 @@ export default function AdventureView() {
               if (msg.role === 'user') return <PlayerBubble key={i} text={msg.text} />;
               return <SystemBubble key={i} text={msg.text} />;
             })}
+            
+            {/* New Items Alert Area */}
+            {newItemsAlert.map((item, idx) => (
+              <ItemPickupAlert key={idx} name={item.name} category={item.category} />
+            ))}
+
             {streamingText && <DmBubble text={streamingText} isStreaming />}
             {isLoading && !streamingText && (
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '4px 0' }}>
@@ -479,48 +504,143 @@ export default function AdventureView() {
           display: 'flex', flexDirection: 'column', gap: '14px',
           zIndex: 9,
         }}>
-          <div>
-            <p style={{ fontSize: '9px', letterSpacing: '0.15em', color: 'var(--text-muted)', textTransform: 'uppercase', margin: '0 0 8px' }}>Estadísticas</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '6px' }}>
-              {Object.entries(character.attributes).map(([k, v]) => {
-                const m = Math.floor(((v as number) - 10) / 2);
-                const colors: Record<string, string> = { str: '#ef4444', dex: '#22d3ee', con: '#f97316', int: '#a78bfa', wis: '#4ade80', cha: '#f472b6' };
-                const labels: Record<string, string> = { str: 'FUE', dex: 'DES', con: 'CON', int: 'INT', wis: 'SAB', cha: 'CAR' };
-                return (
-                  <div key={k} style={{ background: 'rgba(0,0,0,0.4)', border: `1px solid ${colors[k]}22`, borderRadius: '8px', padding: '6px 4px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '8px', color: colors[k], opacity: 0.7, letterSpacing: '0.1em' }}>{labels[k]}</div>
-                    <div style={{ fontSize: '18px', fontFamily: 'var(--font-display)' }}>{v as number}</div>
-                    <div style={{ fontSize: '10px', color: colors[k] }}>{m >= 0 ? `+${m}` : m}</div>
-                  </div>
-                );
-              })}
-            </div>
+          {/* Sidebar Tabs */}
+          <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '16px' }}>
+            <button 
+              onClick={() => setSidebarTab('ficha')}
+              style={{
+                flex: 1, padding: '10px', background: 'none', border: 'none',
+                borderBottom: sidebarTab === 'ficha' ? '2px solid var(--accent-gold)' : 'none',
+                color: sidebarTab === 'ficha' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s'
+              }}
+            >
+              FICHA
+            </button>
+            <button 
+              onClick={() => setSidebarTab('inventario')}
+              style={{
+                flex: 1, padding: '10px', background: 'none', border: 'none',
+                borderBottom: sidebarTab === 'inventario' ? '2px solid var(--accent-gold)' : 'none',
+                color: sidebarTab === 'inventario' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+              }}
+            >
+              INVENTARIO {character.inventory && character.inventory.length > 0 && <span style={{ background: 'var(--accent-gold)', color: 'black', borderRadius: '50%', width: '16px', height: '16px', fontSize: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{character.inventory.length}</span>}
+            </button>
           </div>
 
-          {character.features && character.features.length > 0 && (
-            <div>
-              <p style={{ fontSize: '9px', letterSpacing: '0.15em', color: 'var(--text-muted)', textTransform: 'uppercase', margin: '0 0 8px' }}>Rasgos Pasivos</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {character.features.map((f, i) => (
-                  <div key={i} style={{ background: 'rgba(124,58,237,0.07)', border: '1px solid rgba(124,58,237,0.15)', borderRadius: '8px', padding: '8px 10px' }}>
-                    <div style={{ fontSize: '10px', color: '#c084fc', fontFamily: 'var(--font-display)', marginBottom: '3px' }}>{f.name}</div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>{f.description}</div>
-                  </div>
-                ))}
+          {sidebarTab === 'ficha' ? (
+            <>
+              <div>
+                <p style={{ fontSize: '9px', letterSpacing: '0.15em', color: 'var(--text-muted)', textTransform: 'uppercase', margin: '0 0 8px' }}>Estadísticas</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '6px' }}>
+                  {Object.entries(character.attributes).map(([k, v]) => {
+                    const m = Math.floor(((v as number) - 10) / 2);
+                    const colors: Record<string, string> = { str: '#ef4444', dex: '#22d3ee', con: '#f97316', int: '#a78bfa', wis: '#4ade80', cha: '#f472b6' };
+                    const labels: Record<string, string> = { str: 'FUE', dex: 'DES', con: 'CON', int: 'INT', wis: 'SAB', cha: 'CAR' };
+                    return (
+                      <div key={k} style={{ background: 'rgba(0,0,0,0.4)', border: `1px solid ${colors[k]}22`, borderRadius: '8px', padding: '6px 4px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '8px', color: colors[k], opacity: 0.7, letterSpacing: '0.1em' }}>{labels[k]}</div>
+                        <div style={{ fontSize: '18px', fontFamily: 'var(--font-display)' }}>{v as number}</div>
+                        <div style={{ fontSize: '10px', color: colors[k] }}>{m >= 0 ? `+${m}` : m}</div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
 
-          {charSpells.length > 0 && (
-            <div>
-              <p style={{ fontSize: '9px', letterSpacing: '0.15em', color: 'var(--text-muted)', textTransform: 'uppercase', margin: '0 0 8px' }}>Hechizos</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {charSpells.map(s => (
-                  <div key={s.id} style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: '8px', padding: '8px 10px' }}>
-                    <div style={{ fontSize: '10px', color: '#93c5fd', fontFamily: 'var(--font-display)' }}>{s.name}</div>
-                    <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontStyle: 'italic' }}>{s.type}</div>
+              {character.features && character.features.length > 0 && (
+                <div>
+                  <p style={{ fontSize: '9px', letterSpacing: '0.15em', color: 'var(--text-muted)', textTransform: 'uppercase', margin: '0 0 8px' }}>Rasgos Pasivos</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {character.features.map((f, i) => (
+                      <div key={i} style={{ background: 'rgba(124,58,237,0.07)', border: '1px solid rgba(124,58,237,0.15)', borderRadius: '8px', padding: '8px 10px' }}>
+                        <div style={{ fontSize: '10px', color: '#c084fc', fontFamily: 'var(--font-display)', marginBottom: '3px' }}>{f.name}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>{f.description}</div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+              )}
+
+              {charSpells.length > 0 && (
+                <div>
+                  <p style={{ fontSize: '9px', letterSpacing: '0.15em', color: 'var(--text-muted)', textTransform: 'uppercase', margin: '0 0 8px' }}>Hechizos</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {charSpells.map(s => (
+                      <div key={s.id} style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: '8px', padding: '8px 10px' }}>
+                        <div style={{ fontSize: '10px', color: '#93c5fd', fontFamily: 'var(--font-display)' }}>{s.name}</div>
+                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontStyle: 'italic' }}>{s.type}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Inventory Sub-tabs */}
+              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '2px' }}>
+                <button 
+                  onClick={() => setInventoryTab('equipamiento')}
+                  style={{
+                    flex: 1, padding: '6px', border: 'none', borderRadius: '6px',
+                    background: inventoryTab === 'equipamiento' ? 'rgba(212,175,55,0.1)' : 'transparent',
+                    color: inventoryTab === 'equipamiento' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                    fontSize: '9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}
+                >
+                  <SwordIcon size={12} />
+                </button>
+                <button 
+                  onClick={() => setInventoryTab('consumible')}
+                  style={{
+                    flex: 1, padding: '6px', border: 'none', borderRadius: '6px',
+                    background: inventoryTab === 'consumible' ? 'rgba(212,175,55,0.1)' : 'transparent',
+                    color: inventoryTab === 'consumible' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                    fontSize: '9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}
+                >
+                  <FlaskConical size={12} />
+                </button>
+                <button 
+                  onClick={() => setInventoryTab('otro')}
+                  style={{
+                    flex: 1, padding: '6px', border: 'none', borderRadius: '6px',
+                    background: inventoryTab === 'otro' ? 'rgba(212,175,55,0.1)' : 'transparent',
+                    color: inventoryTab === 'otro' ? 'var(--accent-gold)' : 'var(--text-muted)',
+                    fontSize: '9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}
+                >
+                  <Package size={12} />
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {(character.inventory || []).filter(i => i.category === inventoryTab).length === 0 ? (
+                  <div style={{ padding: '20px', textAlign: 'center', opacity: 0.5 }}>
+                    <p style={{ fontSize: '11px', margin: 0 }}>Vacio</p>
+                  </div>
+                ) : (
+                  (character.inventory || [])
+                    .filter(i => i.category === inventoryTab)
+                    .map(item => (
+                      <div key={item.id} className="glass-panel" style={{ padding: '10px', border: '1px solid rgba(255,255,255,0.05)', position: 'relative' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--accent-gold)', fontWeight: 'bold' }}>{item.name}</span>
+                          <button 
+                            onClick={() => removeItemFromCharacter(character.id, item.id)}
+                            style={{ background: 'none', border: 'none', color: '#ef4444', opacity: 0.5, cursor: 'pointer', padding: '2px' }}
+                          >
+                            <Trash size={12} />
+                          </button>
+                        </div>
+                        <p style={{ fontSize: '10px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>{item.description}</p>
+                      </div>
+                    ))
+                )}
               </div>
             </div>
           )}
