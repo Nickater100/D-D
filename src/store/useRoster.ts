@@ -12,6 +12,9 @@ interface RosterState {
   equipItem: (charId: string, itemId: string) => void;
   equipItemInSlot: (charId: string, itemId: string, slot: string) => void;
   unequipItem: (charId: string, slot: string) => void;
+  addXp: (charId: string, amount: number) => void;
+  addFeatureToCharacter: (charId: string, feature: any) => void;
+  levelUp: (charId: string) => void;
   setActiveCharacter: (id: string | null) => void;
 }
 
@@ -138,6 +141,32 @@ export const useRoster = create<RosterState>()(
           delete (equipment as any)[slot];
           return { ...c, equipment };
         })
+      })),
+    addXp: (charId, amount) =>
+      set((state) => ({
+        characters: state.characters.map((c) =>
+          c.id === charId ? { ...c, xp: (c.xp || 0) + amount } : c
+        ),
+      })),
+    addFeatureToCharacter: (charId, feature) =>
+      set((state) => ({
+        characters: state.characters.map((c) =>
+          c.id === charId ? { ...c, features: [...(c.features || []), feature] } : c
+        ),
+      })),
+    levelUp: (charId) =>
+      set((state) => ({
+        characters: state.characters.map((c) => {
+          if (c.id !== charId) return c;
+          const nextLevel = c.level + 1;
+          const hpGain = Math.floor(Math.random() * 8) + 3; // Simplified HP gain
+          return {
+            ...c,
+            level: nextLevel,
+            maxHp: c.maxHp + hpGain,
+            hp: c.maxHp + hpGain
+          };
+        }),
       })),
     setActiveCharacter: (id) => set({ activeCharacterId: id }),
     }),

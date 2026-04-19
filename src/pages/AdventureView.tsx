@@ -10,7 +10,7 @@ import type { ChatMessage } from '../services/ai';
 import { extractRollRequest, rollDice } from '../utils/diceUtils';
 import type { RollResult, RollRequest } from '../utils/diceUtils';
 import { ADVENTURE_MODULES } from '../data/adventures';
-import { extractItemsFromText, cleanItemTags } from '../utils/itemUtils';
+import { extractItemsFromText, cleanItemTags, extractXpFromText, extractFeaturesFromText } from '../utils/itemUtils';
 import { ShoppingBag, Sword as SwordIcon, FlaskConical, Package, Trash, Shield, ShieldQuestion, Gem, CircleDot, Footprints, Hand, Shirt, HardHat, Waypoints } from 'lucide-react';
 
 // ─── AI Service (Now handled via .env) ───────────────────────────────────────
@@ -19,6 +19,8 @@ import { ShoppingBag, Sword as SwordIcon, FlaskConical, Package, Trash, Shield, 
 function parseDiceTag(text: string) {
   return text.replace(/\[TIRADA:\s*([^\]]+)\]/g, (_, roll) => `🎲 [${roll.trim()}]`);
 }
+
+const XP_LEVELS = [0, 0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000];
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AdventureView() {
@@ -47,7 +49,7 @@ export default function AdventureView() {
   const [newItemsAlert, setNewItemsAlert] = useState<any[]>([]);
   const [slotSelection, setSlotSelection] = useState<string | null>(null);
 
-  const { addItemToCharacter, removeItemFromCharacter, equipItem, equipItemInSlot, unequipItem } = useRoster();
+  const { addItemToCharacter, removeItemFromCharacter, equipItem, equipItemInSlot, unequipItem, addXp, addFeatureToCharacter, levelUp } = useRoster();
 
   const character = characters.find(c => c.id === activeCharacterId);
   const activeModule = ADVENTURE_MODULES.find(m => m.id === activeModuleId);
@@ -107,9 +109,27 @@ export default function AdventureView() {
       if (foundItems.length > 0) {
         foundItems.forEach(item => {
           addItemToCharacter(character.id, item);
-          setNewItemsAlert(prev => [...prev, item]);
+          setNewItemsAlert(prev => [...prev, { ...item, type: 'OBJETO' }]);
         });
-        // Auto-clear alerts after 5s
+      }
+
+      // Check for XP
+      const gainedXp = extractXpFromText(fullResponse);
+      if (gainedXp > 0) {
+        addXp(character.id, gainedXp);
+        setNewItemsAlert(prev => [...prev, { name: `${gainedXp} XP de experiencia`, type: 'XP' }]);
+      }
+
+      // Check for Features
+      const foundFeatures = extractFeaturesFromText(fullResponse);
+      if (foundFeatures.length > 0) {
+        foundFeatures.forEach(feat => {
+          addFeatureToCharacter(character.id, feat);
+          setNewItemsAlert(prev => [...prev, { ...feat, type: 'RASGO' }]);
+        });
+      }
+
+      if (foundItems.length > 0 || gainedXp > 0 || foundFeatures.length > 0) {
         setTimeout(() => setNewItemsAlert([]), 5000);
       }
 
@@ -354,28 +374,129 @@ export default function AdventureView() {
 
         {/* ─── FICHA VIEW ───────────────────────────────────────────────────── */}
         {activeTab === 'ficha' && (
-          <div style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto' }}>
-            <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--accent-gold)', fontSize: '24px', marginBottom: '24px' }}>Ficha del Héroe</h2>
+          <div style={{ padding: '40px', maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '40px' }}>
+            
+            {/* HERO HEADER & XP BAR */}
+            <div className="glass-panel" style={{ padding: '30px', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', marginBottom: '20px' }}>
+                <div>
+                  <div style={{ fontSize: '10px', color: 'var(--accent-gold)', letterSpacing: '2px', fontWeight: 'bold' }}>HÉROE DE NIVEL {character?.level}</div>
+                  <h1 style={{ fontSize: '36px', margin: '0', fontFamily: 'var(--font-display)', color: 'white' }}>{character?.name}</h1>
+                  <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>{character?.race} {character?.className} {character?.subclass && `(${character.subclass})`}</div>
+                </div>
+                
+                {/* Level Up Button */}
+                {character && (character.xp || 0) >= (XP_LEVELS[character.level + 1] || Infinity) && (
+                  <button 
+                    onClick={() => levelUp(character.id)}
+                    className="animate-pulse"
+                    style={{ 
+                      background: 'linear-gradient(45deg, #d4af37, #f1c40f)', color: 'black', 
+                      border: 'none', padding: '12px 24px', borderRadius: '8px', 
+                      fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 0 20px rgba(212,175,55,0.4)',
+                      fontSize: '14px'
+                    }}
+                  >
+                    ✨ ¡SUBIR DE NIVEL!
+                  </button>
+                )}
+              </div>
+
+              {/* XP Progress */}
+              <div style={{ position: 'relative' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '8px', color: 'var(--text-muted)' }}>
+                  <span>XP: {character?.xp || 0}</span>
+                  <span>SIGUIENTE NIVEL: {XP_LEVELS[character!.level + 1] || '---'}</span>
+                </div>
+                <div style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ 
+                    height: '100%', 
+                    width: `${Math.min(100, ((character?.xp || 0) - XP_LEVELS[character!.level]) / (XP_LEVELS[character!.level + 1] - XP_LEVELS[character!.level]) * 100)}%`,
+                    background: 'linear-gradient(90deg, var(--accent-gold), #f1c40f)',
+                    transition: 'width 0.5s ease-out'
+                  }} />
+                </div>
+              </div>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Stats Column */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
                 <div className="glass-panel" style={{ padding: '20px' }}>
-                  <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px' }}>ATRIBUTOS</p>
+                  <p style={{ fontSize: '10px', color: 'var(--accent-gold)', letterSpacing: '1px', marginBottom: '15px', fontWeight: 'bold' }}>ATRIBUTOS</p>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
                     {Object.entries(character?.attributes || {}).map(([k, v]) => {
                       const m = Math.floor(((v as number) - 10) / 2);
                       const colors: Record<string, string> = { str: '#ef4444', dex: '#22d3ee', con: '#f97316', int: '#a78bfa', wis: '#4ade80', cha: '#f472b6' };
                       return (
-                        <div key={k} style={{ textAlign: 'center', padding: '10px', border: `1px solid ${colors[k]}44`, borderRadius: '8px' }}>
-                          <span style={{ fontSize: '10px', color: colors[k] }}>{(k as string).toUpperCase()}</span>
-                          <div style={{ fontSize: '24px' }}>{v as number}</div>
-                          <div style={{ color: colors[k] }}>{m >= 0 ? `+${m}` : m}</div>
+                        <div key={k} style={{ textAlign: 'center', padding: '10px', border: `1px solid ${colors[k]}22`, background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                          <div style={{ fontSize: '8px', color: colors[k], opacity: 0.7 }}>{(k as string).toUpperCase()}</div>
+                          <div style={{ fontSize: '24px', fontFamily: 'var(--font-display)' }}>{v as number}</div>
+                          <div style={{ color: colors[k], fontSize: '12px' }}>{m >= 0 ? `+${m}` : m}</div>
                         </div>
                       );
                     })}
                   </div>
                 </div>
+
+                {/* HP and AC info */}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <div className="glass-panel" style={{ flex: 1, padding: '15px', textAlign: 'center', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                    <div style={{ fontSize: '9px', color: '#fca5a5' }}>PUNTOS DE VIDA</div>
+                    <div style={{ fontSize: '24px', color: 'white' }}>{character?.hp} / {character?.maxHp}</div>
+                  </div>
+                  <div className="glass-panel" style={{ flex: 1, padding: '15px', textAlign: 'center', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                    <div style={{ fontSize: '9px', color: '#93c5fd' }}>CLASE DE ARMADURA</div>
+                    <div style={{ fontSize: '24px', color: 'white' }}>{character?.ac}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Passives and Features Column */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                <div>
+                  <p style={{ fontSize: '10px', color: 'var(--accent-gold)', letterSpacing: '1px', marginBottom: '15px', fontWeight: 'bold' }}>PASIVAS Y RASGOS</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {character?.features?.map((f, i) => (
+                      <div key={i} className="glass-panel animate-fade-in" style={{ 
+                        padding: '14px', borderLeft: `3px solid ${f.source === 'otro' ? '#ef4444' : 'var(--accent-gold)'}`,
+                        background: f.source === 'otro' ? 'rgba(239,68,68,0.05)' : 'rgba(212,175,55,0.05)'
+                      }}>
+                        <div style={{ fontSize: '14px', fontWeight: 'bold', color: f.source === 'otro' ? '#fca5a5' : 'white', marginBottom: '4px' }}>
+                          {f.source === 'otro' && '⚠️ '}{f.name}
+                        </div>
+                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>{f.description}</p>
+                      </div>
+                    ))}
+                    {!character?.features?.length && <div style={{ opacity: 0.3, fontSize: '12px' }}>Ningún rasgo activo.</div>}
+                  </div>
+                </div>
               </div>
             </div>
+
+            {/* SPELLBOOK SECTION */}
+            {charSpells.length > 0 && (
+              <div>
+                <p style={{ fontSize: '10px', color: 'var(--accent-gold)', letterSpacing: '1px', marginBottom: '15px', fontWeight: 'bold' }}>GRIMORIO (HECHIZOS ACTIVOS)</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+                  {charSpells.map(s => (
+                    <div key={s.id} className="glass-panel" style={{ 
+                      padding: '20px', borderTop: '2px solid #a78bfa',
+                      background: 'linear-gradient(180deg, rgba(167,139,250,0.05) 0%, transparent 100%)'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
+                        <div>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>{s.name}</div>
+                          <div style={{ fontSize: '9px', color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '1px' }}>{s.type}</div>
+                        </div>
+                        <div style={{ fontSize: '18px' }}>✨</div>
+                      </div>
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5', margin: 0 }}>{s.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -581,16 +702,32 @@ const PlayerBubble = ({ text }: { text: string }) => (
   </div>
 );
 
-function ItemPickupAlert({ name, category }: { name: string; category: string }) {
+function ItemPickupAlert({ name, category, type }: { name: string; category?: string; type?: string }) {
+  const isXp = type === 'XP';
+  const isRasgo = type === 'RASGO';
+  const isObjeto = type === 'OBJETO';
+
   return (
-    <div className="item-pickup-alert" style={{ alignSelf: 'center', animation: 'slideUp 0.3s ease-out forwards' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--accent-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'black' }}>
-          <Package size={18} />
+    <div className="item-pickup-alert" style={{ 
+      alignSelf: 'center', 
+      animation: 'slideUp 0.3s ease-out forwards',
+      background: isXp ? 'rgba(34, 211, 238, 0.1)' : isRasgo ? 'rgba(239, 68, 68, 0.1)' : 'rgba(212, 175, 55, 0.1)',
+      border: `1px solid ${isXp ? '#22d3ee' : isRasgo ? '#ef4444' : 'var(--accent-gold)'}`,
+      padding: '12px 20px', borderRadius: '12px', minWidth: '300px'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+        <div style={{ 
+          width: '40px', height: '40px', borderRadius: '10px', 
+          background: isXp ? '#22d3ee' : isRasgo ? '#ef4444' : 'var(--accent-gold)', 
+          display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'black' 
+        }}>
+          {isXp ? <Zap size={20} /> : isRasgo ? <Shield size={20} /> : <Package size={20} />}
         </div>
         <div>
-          <div style={{ fontSize: '10px', color: 'var(--accent-gold)', fontWeight: 'bold', letterSpacing: '1px' }}>OBJETO ENCONTRADO</div>
-          <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{name}</div>
+          <div style={{ fontSize: '10px', color: isXp ? '#22d3ee' : isRasgo ? '#ef4444' : 'var(--accent-gold)', fontWeight: 'bold', letterSpacing: '1.5px' }}>
+            {isXp ? 'EXPERIENCIA GANADA' : isRasgo ? 'NUEVO RASGO PASIVO' : 'OBJETO ENCONTRADO'}
+          </div>
+          <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>{name}</div>
         </div>
       </div>
     </div>

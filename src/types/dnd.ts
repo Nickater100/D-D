@@ -63,6 +63,7 @@ export interface Character {
   features?: Feature[];
   inventory?: Item[];
   equipment?: Partial<Record<EquipmentSlot, string>>; // Maps slot to Item ID
+  xp?: number;
 }
 
 export interface Campaign {
