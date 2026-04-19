@@ -308,7 +308,12 @@ export default function AdventureView() {
 
   // ─── Start session on mount ───────────────────────────────────────────────
   useEffect(() => {
-    if (!character || sessionStarted.current) return;
+    // Only proceed if we have a character and haven't started this session yet in this component life
+    if (!character || sessionStarted.current || !currentSessionId) return;
+    
+    // Safety check: ensure currentSession is actually loaded from the store
+    if (!currentSession) return;
+
     sessionStarted.current = true;
     
     if (messages.length === 0) {
@@ -318,7 +323,7 @@ export default function AdventureView() {
         sendMessage(null, true);
       }
     }
-  }, [character, activeModule, messages.length, sendMessage, addMessage]);
+  }, [character, currentSessionId, currentSession, activeModule, messages.length, sendMessage, addMessage]);
 
   // ─── Handle player send ───────────────────────────────────────────────────
   const handleSend = () => {

@@ -65,5 +65,5 @@ REGLAS DE CONDUCTA PARA EL DM:
 8. El tono es épico y oscuro, propio de la fantasía heroica.
 9. Cuando pidas una [TIRADA:], DETENTE. El sistema generará un mensaje como "[SISTEMA: Resultado de la tirada...]" que te indicará qué ha sucedido. NO inventes el resultado tú mismo; espera a recibirlo para narrar las consecuencias.
 
-INICIO: ${module?.startingMessage ? 'La IA NO debe generar la apertura, el jugador ya la ha leído. Espera a su primera acción para continuar la historia siguiendo el contexto.' : 'Cuando el jugador comience, selecciona un escenario inicial apropiado para su clase y trasfondo. Descríbelo en una apertura corta y dramática de 3-4 oraciones. Luego pregunta qué hace.'}`;
+INICIO: ${module?.startingMessage ? 'MUY IMPORTANTE: La aventura YA HA COMENZADO con un texto preescrito que el jugador acaba de leer. NO generes una nueva apertura. Tu primera respuesta debe ser una continuación directa de la escena descrita, reaccionando a la primera acción del jugador de forma coherente con el entorno ya establecido.' : 'Cuando el jugador comience, selecciona un escenario inicial apropiado para su clase y trasfondo. Descríbelo en una apertura corta y dramática de 3-4 oraciones. Luego pregunta qué hace.'}`;
 }
