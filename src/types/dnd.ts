@@ -28,10 +28,17 @@ export interface Feature {
   source: 'raza' | 'trasfondo' | 'clase' | 'otro';
 }
 
+export type EquipmentSlot = 
+  | 'head' | 'cloak' | 'torso' | 'gloves' | 'boots' 
+  | 'amulet' | 'ring1' | 'ring2' 
+  | 'mainHand' | 'offHand' | 'ranged';
+
 export interface Item {
   id: string;
   name: string;
   category: 'equipamiento' | 'consumible' | 'otro';
+  subtype?: 'arma' | 'armadura' | 'escudo' | 'casco' | 'guantes' | 'botas' | 'capa' | 'amuleto' | 'anillo' | 'otro';
+  properties?: string[]; // e.g., 'dos-manos', 'sutil', 'pesada', 'distancia'
   description: string;
   rarity: 'común' | 'poco común' | 'raro' | 'muy raro' | 'legendario';
   quantity?: number;
@@ -55,6 +62,7 @@ export interface Character {
   feats?: string[]; // List of feat IDs
   features?: Feature[];
   inventory?: Item[];
+  equipment?: Partial<Record<EquipmentSlot, string>>; // Maps slot to Item ID
 }
 
 export interface Campaign {

@@ -11,7 +11,7 @@ import { extractRollRequest, rollDice } from '../utils/diceUtils';
 import type { RollResult, RollRequest } from '../utils/diceUtils';
 import { ADVENTURE_MODULES } from '../data/adventures';
 import { extractItemsFromText, cleanItemTags } from '../utils/itemUtils';
-import { ShoppingBag, Sword as SwordIcon, FlaskConical, Package, Trash } from 'lucide-react';
+import { ShoppingBag, Sword as SwordIcon, FlaskConical, Package, Trash, Shield, ShieldQuestion, Gem, CircleDot, Footprints, Hand, Shirt, HardHat, Waypoints } from 'lucide-react';
 
 // ─── AI Service (Now handled via .env) ───────────────────────────────────────
 
@@ -19,169 +19,6 @@ import { ShoppingBag, Sword as SwordIcon, FlaskConical, Package, Trash } from 'l
 function parseDiceTag(text: string) {
   return text.replace(/\[TIRADA:\s*([^\]]+)\]/g, (_, roll) => `🎲 [${roll.trim()}]`);
 }
-
-// ─── DM Message Bubble ───────────────────────────────────────────────────────
-const DmBubble = React.memo(({ text, isStreaming }: { text: string; isStreaming?: boolean }) => (
-  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '4px 0' }}>
-    <div style={{
-      width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
-      background: 'linear-gradient(135deg, #7c3aed, #4f46e5)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: '16px', boxShadow: '0 0 12px rgba(124,58,237,0.4)'
-    }}>🎭</div>
-    <div style={{
-      background: 'rgba(124, 58, 237, 0.08)',
-      border: '1px solid rgba(124, 58, 237, 0.2)',
-      borderRadius: '4px 16px 16px 16px',
-      padding: '12px 16px',
-      maxWidth: '85%',
-      fontSize: '14px',
-      lineHeight: '1.7',
-      color: 'var(--text-primary)',
-      fontFamily: 'Georgia, serif',
-      letterSpacing: '0.01em',
-    }}>
-      {parseDiceTag(text)}
-      {isStreaming && <span style={{ 
-        display: 'inline-block', width: '2px', height: '14px', 
-        background: '#a78bfa', marginLeft: '2px', verticalAlign: 'middle',
-        animation: 'blink 0.8s step-end infinite'
-      }}/>}
-    </div>
-  </div>
-));
-
-// ─── Player Message Bubble ────────────────────────────────────────────────────
-const PlayerBubble = React.memo(({ text }: { text: string }) => (
-  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', justifyContent: 'flex-end', padding: '4px 0' }}>
-    <div style={{
-      background: 'rgba(212, 175, 55, 0.1)',
-      border: '1px solid rgba(212, 175, 55, 0.25)',
-      borderRadius: '16px 4px 16px 16px',
-      padding: '10px 16px',
-      maxWidth: '75%',
-      fontSize: '14px',
-      lineHeight: '1.6',
-      color: 'var(--text-primary)',
-    }}>
-      {text}
-    </div>
-    <div style={{
-      width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
-      background: 'linear-gradient(135deg, #d4af37, #92670a)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: '14px', boxShadow: '0 0 8px rgba(212,175,55,0.3)'
-    }}>⚔️</div>
-  </div>
-));
-
-// ─── Animated d20 Component ──────────────────────────────────────────────────
-const D20Die = ({ isRolling, result }: { isRolling: boolean; result: number | null }) => (
-  <div style={{
-    width: '60px', height: '60px', position: 'relative',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    transform: isRolling ? 'rotate(360deg)' : 'none',
-    transition: 'transform 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-  }}>
-    <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%', filter: 'drop-shadow(0 0 8px rgba(212,175,55,0.4))' }}>
-      <path d="M50 5 L95 25 L95 75 L50 95 L5 75 L5 25 Z" fill="rgba(8, 8, 20, 0.9)" stroke="#d4af37" strokeWidth="2"/>
-      <path d="M50 5 L50 95 M5 25 L95 25 M5 75 L95 75 M50 5 L5 75 M50 5 L95 75 M5 25 L50 95 M95 25 L50 95" stroke="#d4af37" strokeWidth="1" opacity="0.5"/>
-      <text x="50" y="58" textAnchor="middle" fill="#d4af37" fontSize="24" fontWeight="bold" fontFamily="var(--font-display)">
-        {isRolling ? '?' : (result || 20)}
-      </text>
-    </svg>
-  </div>
-);
-
-// ─── Dice Roller Overlay ─────────────────────────────────────────────────────
-const DiceOverlay = ({ rollRequest, isRolling, result, onRoll }: any) => {
-  const getStatusColor = () => {
-    if (!result) return 'var(--accent-gold)';
-    if (result.isCritical) return '#fbbf24'; // Intense gold
-    if (result.isFumble) return '#ef4444'; // Bright red
-    if (result.isSuccess === true) return '#4ade80'; // Green
-    if (result.isSuccess === false) return '#f87171'; // Red
-    return 'var(--accent-gold)';
-  };
-
-  const color = getStatusColor();
-
-  return (
-    <div style={{
-      position: 'absolute', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
-      width: '90%', maxWidth: '400px', background: 'rgba(8, 8, 20, 0.98)',
-      border: `2px solid ${color}`, borderRadius: '16px',
-      padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px',
-      boxShadow: `0 10px 40px rgba(0,0,0,0.9), 0 0 30px ${color}22`,
-      zIndex: 30, animation: 'slideUp 0.3s ease-out',
-      transition: 'border-color 0.4s, box-shadow 0.4s'
-    }}>
-      <div style={{ textAlign: 'center' }}>
-        <p style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.2em', margin: '0 0 6px' }}>
-          {rollRequest.dc ? `OBJETIVO CD: ${rollRequest.dc}` : 'TIRADA REQUERIDA'}
-        </p>
-        <h3 style={{ margin: 0, color: 'white', fontSize: '24px', fontFamily: 'var(--font-display)' }}>
-          {rollRequest.formula}
-        </h3>
-      </div>
-      
-      <div style={{ 
-        transform: result?.isFumble ? 'translateX(0px)' : 'none',
-        animation: result?.isFumble ? 'shake 0.4s ease-in-out' : 'none'
-      }}>
-        <D20Die isRolling={isRolling} result={result?.dice} />
-      </div>
-
-      <div style={{ textAlign: 'center', height: '24px' }}>
-        {result && (
-          <p style={{ 
-            margin: 0, color, fontWeight: 'bold', fontSize: '16px', 
-            letterSpacing: '0.1em', animation: 'fadeIn 0.3s' 
-          }}>
-            {result.isCritical ? '¡CRÍTICO!' : (result.isFumble ? '¡PIFIA!' : (result.isSuccess ? '¡ÉXITO!' : (result.isSuccess === false ? 'FALLO' : '')))}
-          </p>
-        )}
-      </div>
-      
-      <button 
-        className="btn-primary" 
-        onClick={onRoll} 
-        disabled={isRolling || !!result}
-        style={{ 
-          width: '100%', padding: '14px', 
-          background: result ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #d4af37, #92670a)',
-          color: result ? 'var(--text-muted)' : 'black',
-          opacity: isRolling ? 0.7 : 1 
-        }}
-      >
-        {isRolling ? 'LANZANDO...' : (result ? 'COMPLETADO' : 'LANZAR DADO')}
-      </button>
-    </div>
-  );
-};
-
-// ─── System Message Bubble ───────────────────────────────────────────────────
-const SystemBubble = React.memo(({ text }: { text: string }) => (
-  <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0' }}>
-    <div style={{
-      background: 'rgba(212, 175, 55, 0.05)',
-      border: '1px solid rgba(212, 175, 55, 0.2)',
-      borderRadius: '8px',
-      padding: '8px 24px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '10px',
-      color: 'var(--accent-gold)',
-      fontSize: '12px',
-      fontStyle: 'italic',
-      letterSpacing: '0.05em',
-      boxShadow: 'inset 0 0 15px rgba(212,175,55,0.05)'
-    }}>
-      <RotateCcw size={14} />
-      {text}
-    </div>
-  </div>
-));
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AdventureView() {
@@ -205,11 +42,12 @@ export default function AdventureView() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const sessionStarted = useRef(false);
 
-  const [sidebarTab, setSidebarTab] = useState<'ficha' | 'inventario'>('ficha');
+  const [activeTab, setActiveTab] = useState<'aventura' | 'ficha' | 'inventario' | 'equipo'>('aventura');
   const [inventoryTab, setInventoryTab] = useState<'equipamiento' | 'consumible' | 'otro'>('equipamiento');
   const [newItemsAlert, setNewItemsAlert] = useState<any[]>([]);
+  const [slotSelection, setSlotSelection] = useState<string | null>(null);
 
-  const { addItemToCharacter, removeItemFromCharacter } = useRoster();
+  const { addItemToCharacter, removeItemFromCharacter, equipItem, equipItemInSlot, unequipItem } = useRoster();
 
   const character = characters.find(c => c.id === activeCharacterId);
   const activeModule = ADVENTURE_MODULES.find(m => m.id === activeModuleId);
@@ -344,7 +182,7 @@ export default function AdventureView() {
     }
   }, [character, currentSessionId, currentSession, activeModule, messages.length, sendMessage, addMessage]);
 
-  // ─── Handle player send ───────────────────────────────────────────────────
+// ─── Handle player send ───────────────────────────────────────────────────
   const handleSend = () => {
     const text = inputText.trim();
     if (!text || isLoading) return;
@@ -361,7 +199,7 @@ export default function AdventureView() {
     sessionStarted.current = false;
     clearCurrentSession();
     setTimeout(() => {
-      navigate('/campaigns'); // Go back to library on restart to be safe, or just clear.
+      navigate('/campaigns');
     }, 100);
   };
 
@@ -382,270 +220,294 @@ export default function AdventureView() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
-      {/* CSS for animations */}
-      <style>{`
-        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-        @keyframes slideUp { from{transform: translateX(-50%) translateY(20px); opacity:0} to{transform: translateX(-50%) translateY(0); opacity:1} }
-        @keyframes fadeIn { from{opacity:0} to{opacity:1} }
-        @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
-      `}</style>
-
-
-      {/* ─── HEADER ─────────────────────────────────────────────────────── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 16px',
-        background: 'rgba(0,0,0,0.7)',
-        borderBottom: '1px solid rgba(212,175,55,0.15)',
-        backdropFilter: 'blur(12px)',
-        position: 'sticky', top: 0, zIndex: 10
+    <div style={{
+      height: '100vh', width: '100vw',
+      background: 'var(--bg-black)',
+      display: 'flex', flexDirection: 'column',
+      color: 'white', overflow: 'hidden'
+    }}>
+      {/* ─── MAIN HEADER / NAVIGATION ────────────────────────────────────────── */}
+      <header style={{
+        height: '60px', borderBottom: '1px solid rgba(255,255,255,0.1)',
+        display: 'flex', alignItems: 'center', padding: '0 20px', gap: '20px',
+        background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', zIndex: 100
       }}>
+        <button onClick={() => navigate('/campaigns')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+          <ArrowLeft size={20} />
+        </button>
+        
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: '10px' }}>
+          {[
+            { id: 'aventura', label: 'AVENTURA', icon: <Wand2 size={16} /> },
+            { id: 'ficha', label: 'FICHA', icon: <Scroll size={16} /> },
+            { id: 'inventario', label: 'INVENTARIO', icon: <ShoppingBag size={16} /> },
+            { id: 'equipo', label: 'EQUIPO', icon: <Sword size={16} /> }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id as any); setSlotSelection(null); }}
+              style={{
+                background: activeTab === tab.id ? 'rgba(212,175,55,0.1)' : 'none',
+                border: 'none', 
+                borderBottom: activeTab === tab.id ? '2px solid var(--accent-gold)' : '2px solid transparent',
+                color: activeTab === tab.id ? 'var(--accent-gold)' : 'var(--text-muted)',
+                padding: '8px 16px', fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.1em',
+                cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '8px'
+              }}
+            >
+              {tab.icon} {tab.label}
+              {tab.id === 'inventario' && character?.inventory?.length > 0 && (
+                <span style={{ fontSize: '10px', opacity: 0.7 }}>({character.inventory.length})</span>
+              )}
+            </button>
+          ))}
+        </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button className="btn-secondary" style={{ padding: '6px' }} onClick={() => navigate('/')}>
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <p style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.15em', textTransform: 'uppercase', margin: 0 }}>Aventura Activa</p>
-            <h3 style={{ margin: 0, fontFamily: 'var(--font-display)', color: 'var(--accent-gold)', fontSize: '16px' }}>
-              {character.name}
-            </h3>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '12px', fontWeight: 'bold' }}>{character?.name}</div>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>LVL {character?.level} {character?.className}</div>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <span style={{ fontSize: '10px', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: '6px', padding: '3px 8px' }}>
-              ❤️ {character.maxHp} HP
-            </span>
-            <span style={{ fontSize: '10px', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#93c5fd', borderRadius: '6px', padding: '3px 8px' }}>
-              🛡️ {character.ac} CA
-            </span>
+          <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--accent-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'black' }}>
+            <SwordIcon size={18} />
           </div>
         </div>
+      </header>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            onClick={handleRestart}
-            title="Nueva sesión"
-            style={{ padding: '6px 10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}
-          >
-            <RotateCcw size={14} /> Reiniciar
-          </button>
-          <button
-            onClick={() => setSidebarOpen(p => !p)}
-            style={{ padding: '6px 10px', background: sidebarOpen ? 'rgba(124,58,237,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${sidebarOpen ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: '8px', color: sidebarOpen ? '#a78bfa' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}
-          >
-            <Scroll size={14} /> Ficha
-          </button>
-        </div>
-      </div>
-
-      {/* ─── MAIN LAYOUT ─────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-
-        {/* ─── CHAT AREA ──────────────────────────────────────────────────── */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '20px 16px 120px',
-          transition: 'margin-right 0.3s ease',
-          marginRight: sidebarOpen ? '280px' : '0',
-        }}>
-          {messages.length === 0 && !streamingText && (
-            <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--text-muted)' }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎭</div>
-              <p style={{ fontFamily: 'Georgia, serif', fontSize: '15px', fontStyle: 'italic' }}>
-                El Narrador está preparando tu destino...
-              </p>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '760px', margin: '0 auto' }}>
-            {messages.map((msg, i) => {
-              if (msg.role === 'model') return <DmBubble key={i} text={msg.text} />;
-              if (msg.role === 'user') return <PlayerBubble key={i} text={msg.text} />;
-              return <SystemBubble key={i} text={msg.text} />;
-            })}
-            
-            {/* New Items Alert Area */}
-            {newItemsAlert.map((item, idx) => (
-              <ItemPickupAlert key={idx} name={item.name} category={item.category} />
-            ))}
-
-            {streamingText && <DmBubble text={streamingText} isStreaming />}
-            {isLoading && !streamingText && (
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '4px 0' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>🎭</div>
-                <div style={{ display: 'flex', gap: '5px', padding: '14px 18px', background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: '4px 16px 16px 16px' }}>
-                  {[0,1,2].map(i => (
-                    <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#a78bfa', animation: `blink 1.2s ease-in-out ${i * 0.2}s infinite` }} />
-                  ))}
-                </div>
-              </div>
-            )}
-            {error && (
-              <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '12px', padding: '12px 16px', color: '#fca5a5', fontSize: '13px' }}>
-                {error}
-              </div>
-            )}
-          </div>
-          <div ref={chatEndRef} />
-        </div>
-
-        {/* ─── SIDEBAR — CHARACTER SHEET ───────────────────────────────────── */}
-        <div style={{
-          position: 'fixed', top: '57px', right: 0, bottom: 0,
-          width: '280px',
-          background: 'rgba(8, 8, 20, 0.95)',
-          borderLeft: '1px solid rgba(255,255,255,0.06)',
-          backdropFilter: 'blur(12px)',
-          transform: sidebarOpen ? 'translateX(0)' : 'translateX(100%)',
-          transition: 'transform 0.3s ease',
-          overflowY: 'auto',
-          padding: '16px',
-          display: 'flex', flexDirection: 'column', gap: '14px',
-          zIndex: 9,
-        }}>
-          {/* Sidebar Tabs */}
-          <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '16px' }}>
-            <button 
-              onClick={() => setSidebarTab('ficha')}
-              style={{
-                flex: 1, padding: '10px', background: 'none', border: 'none',
-                borderBottom: sidebarTab === 'ficha' ? '2px solid var(--accent-gold)' : 'none',
-                color: sidebarTab === 'ficha' ? 'var(--accent-gold)' : 'var(--text-muted)',
-                fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s'
-              }}
-            >
-              FICHA
-            </button>
-            <button 
-              onClick={() => setSidebarTab('inventario')}
-              style={{
-                flex: 1, padding: '10px', background: 'none', border: 'none',
-                borderBottom: sidebarTab === 'inventario' ? '2px solid var(--accent-gold)' : 'none',
-                color: sidebarTab === 'inventario' ? 'var(--accent-gold)' : 'var(--text-muted)',
-                fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
-              }}
-            >
-              INVENTARIO {character.inventory && character.inventory.length > 0 && <span style={{ background: 'var(--accent-gold)', color: 'black', borderRadius: '50%', width: '16px', height: '16px', fontSize: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{character.inventory.length}</span>}
-            </button>
-          </div>
-
-          {sidebarTab === 'ficha' ? (
-            <>
-              <div>
-                <p style={{ fontSize: '9px', letterSpacing: '0.15em', color: 'var(--text-muted)', textTransform: 'uppercase', margin: '0 0 8px' }}>Estadísticas</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '6px' }}>
-                  {Object.entries(character.attributes).map(([k, v]) => {
-                    const m = Math.floor(((v as number) - 10) / 2);
-                    const colors: Record<string, string> = { str: '#ef4444', dex: '#22d3ee', con: '#f97316', int: '#a78bfa', wis: '#4ade80', cha: '#f472b6' };
-                    const labels: Record<string, string> = { str: 'FUE', dex: 'DES', con: 'CON', int: 'INT', wis: 'SAB', cha: 'CAR' };
-                    return (
-                      <div key={k} style={{ background: 'rgba(0,0,0,0.4)', border: `1px solid ${colors[k]}22`, borderRadius: '8px', padding: '6px 4px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '8px', color: colors[k], opacity: 0.7, letterSpacing: '0.1em' }}>{labels[k]}</div>
-                        <div style={{ fontSize: '18px', fontFamily: 'var(--font-display)' }}>{v as number}</div>
-                        <div style={{ fontSize: '10px', color: colors[k] }}>{m >= 0 ? `+${m}` : m}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {character.features && character.features.length > 0 && (
-                <div>
-                  <p style={{ fontSize: '9px', letterSpacing: '0.15em', color: 'var(--text-muted)', textTransform: 'uppercase', margin: '0 0 8px' }}>Rasgos Pasivos</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {character.features.map((f, i) => (
-                      <div key={i} style={{ background: 'rgba(124,58,237,0.07)', border: '1px solid rgba(124,58,237,0.15)', borderRadius: '8px', padding: '8px 10px' }}>
-                        <div style={{ fontSize: '10px', color: '#c084fc', fontFamily: 'var(--font-display)', marginBottom: '3px' }}>{f.name}</div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>{f.description}</div>
-                      </div>
-                    ))}
-                  </div>
+      {/* ─── MAIN TAB CONTENT AREA ────────────────────────────────────────────── */}
+      <main style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+        {activeTab === 'aventura' && (
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', maxWidth: '900px', margin: '0 auto', width: '100%' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 120px' }}>
+              {messages.length === 0 && !streamingText && (
+                <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎭</div>
+                  <p style={{ fontFamily: 'Georgia, serif', fontSize: '15px', fontStyle: 'italic' }}>
+                    El Narrador está preparando tu destino...
+                  </p>
                 </div>
               )}
 
-              {charSpells.length > 0 && (
-                <div>
-                  <p style={{ fontSize: '9px', letterSpacing: '0.15em', color: 'var(--text-muted)', textTransform: 'uppercase', margin: '0 0 8px' }}>Hechizos</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {charSpells.map(s => (
-                      <div key={s.id} style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: '8px', padding: '8px 10px' }}>
-                        <div style={{ fontSize: '10px', color: '#93c5fd', fontFamily: 'var(--font-display)' }}>{s.name}</div>
-                        <div style={{ fontSize: '9px', color: 'var(--text-muted)', fontStyle: 'italic' }}>{s.type}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* Inventory Sub-tabs */}
-              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '2px' }}>
-                <button 
-                  onClick={() => setInventoryTab('equipamiento')}
-                  style={{
-                    flex: 1, padding: '6px', border: 'none', borderRadius: '6px',
-                    background: inventoryTab === 'equipamiento' ? 'rgba(212,175,55,0.1)' : 'transparent',
-                    color: inventoryTab === 'equipamiento' ? 'var(--accent-gold)' : 'var(--text-muted)',
-                    fontSize: '9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}
-                >
-                  <SwordIcon size={12} />
-                </button>
-                <button 
-                  onClick={() => setInventoryTab('consumible')}
-                  style={{
-                    flex: 1, padding: '6px', border: 'none', borderRadius: '6px',
-                    background: inventoryTab === 'consumible' ? 'rgba(212,175,55,0.1)' : 'transparent',
-                    color: inventoryTab === 'consumible' ? 'var(--accent-gold)' : 'var(--text-muted)',
-                    fontSize: '9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}
-                >
-                  <FlaskConical size={12} />
-                </button>
-                <button 
-                  onClick={() => setInventoryTab('otro')}
-                  style={{
-                    flex: 1, padding: '6px', border: 'none', borderRadius: '6px',
-                    background: inventoryTab === 'otro' ? 'rgba(212,175,55,0.1)' : 'transparent',
-                    color: inventoryTab === 'otro' ? 'var(--accent-gold)' : 'var(--text-muted)',
-                    fontSize: '9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}
-                >
-                  <Package size={12} />
-                </button>
-              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {messages.map((msg, i) => {
+                  if (msg.role === 'model') return <DmBubble key={i} text={msg.text} />;
+                  if (msg.role === 'user') return <PlayerBubble key={i} text={msg.text} />;
+                  return <SystemBubble key={i} text={msg.text} />;
+                })}
+                
+                {newItemsAlert.map((item, idx) => (
+                  <ItemPickupAlert key={idx} name={item.name} category={item.category} />
+                ))}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {(character.inventory || []).filter(i => i.category === inventoryTab).length === 0 ? (
-                  <div style={{ padding: '20px', textAlign: 'center', opacity: 0.5 }}>
-                    <p style={{ fontSize: '11px', margin: 0 }}>Vacio</p>
+                {streamingText && <DmBubble text={streamingText} isStreaming />}
+                {isLoading && !streamingText && (
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '4px 0' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>🎭</div>
+                    <div style={{ display: 'flex', gap: '5px', padding: '14px 18px', background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: '4px 16px 16px 16px' }}>
+                      {[0,1,2].map(i => (
+                        <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#a78bfa', animation: `blink 1.2s ease-in-out ${i * 0.2}s infinite` }} />
+                      ))}
+                    </div>
                   </div>
-                ) : (
-                  (character.inventory || [])
-                    .filter(i => i.category === inventoryTab)
-                    .map(item => (
-                      <div key={item.id} className="glass-panel" style={{ padding: '10px', border: '1px solid rgba(255,255,255,0.05)', position: 'relative' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '4px' }}>
-                          <span style={{ fontSize: '11px', color: 'var(--accent-gold)', fontWeight: 'bold' }}>{item.name}</span>
-                          <button 
-                            onClick={() => removeItemFromCharacter(character.id, item.id)}
-                            style={{ background: 'none', border: 'none', color: '#ef4444', opacity: 0.5, cursor: 'pointer', padding: '2px' }}
-                          >
-                            <Trash size={12} />
-                          </button>
-                        </div>
-                        <p style={{ fontSize: '10px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>{item.description}</p>
-                      </div>
-                    ))
+                )}
+                {error && (
+                  <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '12px', padding: '12px 16px', color: '#fca5a5', fontSize: '13px' }}>
+                    {error}
+                  </div>
                 )}
               </div>
+              <div ref={chatEndRef} />
             </div>
-          )}
-        </div>
-      </div>
+
+            {/* Input area */}
+            <div style={{ padding: '20px', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.5)' }}>
+              <div style={{ position: 'relative', maxWidth: '800px', margin: '0 auto' }}>
+                <textarea
+                  ref={inputRef}
+                  value={inputText}
+                  onChange={e => setInputText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  disabled={isLoading || !!pendingRoll}
+                  placeholder={pendingRoll ? "Completa la tirada para continuar..." : "¿Qué hace tu personaje...?"}
+                  rows={1}
+                  style={{
+                    width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '12px', padding: '12px 60px 12px 14px', color: 'white', resize: 'none', fontSize: '14px'
+                  }}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={isLoading || !inputText.trim() || !!pendingRoll}
+                  style={{
+                    position: 'absolute', right: '10px', bottom: '10px',
+                    width: '36px', height: '36px', borderRadius: '10px',
+                    background: 'var(--accent-gold)', color: 'black',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                  }}
+                >
+                  <Send size={18} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── FICHA VIEW ───────────────────────────────────────────────────── */}
+        {activeTab === 'ficha' && (
+          <div style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto' }}>
+            <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--accent-gold)', fontSize: '24px', marginBottom: '24px' }}>Ficha del Héroe</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div className="glass-panel" style={{ padding: '20px' }}>
+                  <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px' }}>ATRIBUTOS</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                    {Object.entries(character?.attributes || {}).map(([k, v]) => {
+                      const m = Math.floor(((v as number) - 10) / 2);
+                      const colors: Record<string, string> = { str: '#ef4444', dex: '#22d3ee', con: '#f97316', int: '#a78bfa', wis: '#4ade80', cha: '#f472b6' };
+                      return (
+                        <div key={k} style={{ textAlign: 'center', padding: '10px', border: `1px solid ${colors[k]}44`, borderRadius: '8px' }}>
+                          <span style={{ fontSize: '10px', color: colors[k] }}>{(k as string).toUpperCase()}</span>
+                          <div style={{ fontSize: '24px' }}>{v as number}</div>
+                          <div style={{ color: colors[k] }}>{m >= 0 ? `+${m}` : m}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── INVENTARIO VIEW ──────────────────────────────────────────────── */}
+        {activeTab === 'inventario' && (
+          <div style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+              <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--accent-gold)', fontSize: '24px', margin: 0 }}>Inventario</h2>
+              <div style={{ display: 'flex', gap: '10px', background: 'rgba(255,255,255,0.05)', padding: '5px', borderRadius: '10px' }}>
+                {['equipamiento', 'consumible', 'otro'].map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setInventoryTab(cat as any)}
+                    style={{
+                      padding: '8px 16px', borderRadius: '8px', border: 'none', fontSize: '12px',
+                      background: inventoryTab === cat ? 'var(--accent-gold)' : 'none',
+                      color: inventoryTab === cat ? 'black' : 'var(--text-muted)',
+                      cursor: 'pointer', transition: 'all 0.2s'
+                    }}
+                  >
+                    {cat.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+              {(character?.inventory || []).filter(i => i.category === inventoryTab).map(item => (
+                <div key={item.id} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--accent-gold)', fontWeight: 'bold' }}>{item.name}</span>
+                    <button onClick={() => removeItemFromCharacter(character!.id, item.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash size={14} /></button>
+                  </div>
+                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', flex: 1 }}>{item.description}</p>
+                  {item.category === 'equipamiento' && (
+                    <button 
+                      onClick={() => equipItem(character!.id, item.id)}
+                      style={{ padding: '8px', borderRadius: '6px', background: 'rgba(212,175,55,0.1)', border: '1px solid var(--accent-gold)', color: 'var(--accent-gold)', cursor: 'pointer' }}
+                    >
+                      Equipar
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ─── EQUIPO VIEW ───────────────────────────────────────────────────── */}
+        {activeTab === 'equipo' && (
+          <div style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px' }}>
+            <div style={{ position: 'relative', height: '600px', display: 'grid', gridTemplateColumns: '120px 1fr 120px', gap: '20px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <EquipmentSlotUI slot="head" label="Cabeza" icon={<HardHat />} character={character!} onSelect={setSlotSelection} />
+                <EquipmentSlotUI slot="cloak" label="Capa" icon={<Waypoints />} character={character!} onSelect={setSlotSelection} />
+                <EquipmentSlotUI slot="torso" label="Torso" icon={<Shirt />} character={character!} onSelect={setSlotSelection} />
+                <EquipmentSlotUI slot="gloves" label="Guantes" icon={<Hand />} character={character!} onSelect={setSlotSelection} />
+                <EquipmentSlotUI slot="boots" label="Botas" icon={<Footprints />} character={character!} onSelect={setSlotSelection} />
+              </div>
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '20px' }}>
+                <div style={{ textAlign: 'center', opacity: 0.2 }}>
+                  <SwordIcon size={120} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <EquipmentSlotUI slot="amulet" label="Amuleto" icon={<Gem />} character={character!} onSelect={setSlotSelection} />
+                <EquipmentSlotUI slot="ring1" label="Anillo 1" icon={<CircleDot />} character={character!} onSelect={setSlotSelection} />
+                <EquipmentSlotUI slot="ring2" label="Anillo 2" icon={<CircleDot />} character={character!} onSelect={setSlotSelection} />
+                <EquipmentSlotUI slot="mainHand" label="Principal" icon={<SwordIcon />} character={character!} onSelect={setSlotSelection} />
+                <EquipmentSlotUI slot="offHand" label="Secundario" icon={<Shield />} character={character!} onSelect={setSlotSelection} />
+                <EquipmentSlotUI slot="ranged" label="Distancia" icon={<CircleDot />} character={character!} onSelect={setSlotSelection} />
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '24px', border: '1px solid rgba(255,255,255,0.05)', overflowY: 'auto' }}>
+              {slotSelection ? (
+                <div>
+                  <h3 style={{ margin: '0 0 20px', fontSize: '18px', color: 'var(--accent-gold)' }}>Seleccionar: {slotSelection.toUpperCase()}</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {(character?.inventory || [])
+                      .filter(i => i.category === 'equipamiento')
+                      .filter(i => {
+                        const s = slotSelection.toLowerCase();
+                        const name = i.name.toLowerCase();
+                        const subtype = i.subtype;
+
+                        if (s === 'mainhand') return subtype === 'arma' || name.includes('espada') || name.includes('daga') || name.includes('hacha') || name.includes('mazo') || name.includes('garrote');
+                        if (s === 'offhand') return subtype === 'escudo' || subtype === 'arma' || name.includes('escudo') || name.includes('daga') || name.includes('espada corta');
+                        if (s === 'ranged') return (subtype === 'arma' && i.properties?.includes('distancia')) || name.includes('arco') || name.includes('ballesta');
+                        if (s === 'head') return subtype === 'casco' || name.includes('casco') || name.includes('yelmo') || name.includes('diadema');
+                        if (s === 'torso') return subtype === 'armadura' || name.includes('armadura') || name.includes('cota') || name.includes('jubon') || name.includes('tunica');
+                        if (s === 'cloak') return subtype === 'capa' || name.includes('capa') || name.includes('manto');
+                        if (s === 'gloves') return subtype === 'guantes' || name.includes('guantes') || name.includes('protegebrazos');
+                        if (s === 'boots') return subtype === 'botas' || name.includes('botas') || name.includes('calzado');
+                        if (s === 'amulet') return subtype === 'amuleto' || name.includes('amuleto') || name.includes('collar') || name.includes('medallon');
+                        if (s === 'ring1' || s === 'ring2') return subtype === 'anillo' || name.includes('anillo') || name.includes('sortija');
+                        
+                        return false;
+                      })
+                      .map(item => (
+                        <div 
+                          key={item.id} 
+                          onClick={() => { equipItemInSlot(character!.id, item.id, slotSelection); setSlotSelection(null); }}
+                          style={{ 
+                            padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', cursor: 'pointer',
+                            border: '1px solid transparent', transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.border = '1px solid var(--accent-gold)'}
+                          onMouseLeave={e => e.currentTarget.style.border = '1px solid transparent'}
+                        >
+                          <div style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--accent-gold)' }}>{item.name}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{item.description}</div>
+                        </div>
+                      ))}
+                    <button 
+                      onClick={() => { unequipItem(character!.id, slotSelection); setSlotSelection(null); }}
+                      style={{ padding: '12px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', marginTop: '20px' }}
+                    >
+                      Desequipar Ranura
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', paddingTop: '100px', opacity: 0.3 }}>
+                  <ShieldQuestion size={48} style={{ marginBottom: '20px' }} />
+                  <p>Selecciona una ranura para equipar objetos</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </main>
 
       {/* ─── DICE OVERLAY ────────────────────────────────────────────────── */}
       {pendingRoll && (
@@ -656,68 +518,119 @@ export default function AdventureView() {
           onRoll={handleRoll}
         />
       )}
+    </div>
+  );
+}
 
-      {/* ─── INPUT BAR (fixed bottom) ────────────────────────────────────── */}
-      <div style={{
-        position: 'fixed', bottom: 0, left: 0,
-        right: sidebarOpen ? '280px' : '0',
-        transition: 'right 0.3s ease',
-        background: 'rgba(5, 5, 15, 0.95)',
-        borderTop: '1px solid rgba(255,255,255,0.07)',
-        backdropFilter: 'blur(16px)',
-        padding: '12px 16px',
-        zIndex: 20,
-      }}>
-        <div style={{ maxWidth: '760px', margin: '0 auto', display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
-          <textarea
-            ref={inputRef}
-            value={inputText}
-            onChange={e => setInputText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isLoading || !!pendingRoll}
-            placeholder={pendingRoll ? "Completa la tirada para continuar..." : "¿Qué hace tu personaje...?"}
-            rows={1}
-            style={{
-              flex: 1,
-              background: 'rgba(255,255,255,0.04)',
-              border: pendingRoll ? '1px solid rgba(212,175,55,0.3)' : '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '12px',
-              padding: '10px 14px',
-              color: pendingRoll ? 'var(--text-muted)' : 'var(--text-primary)',
-              fontSize: '14px',
-              resize: 'none',
-              outline: 'none',
-              fontFamily: 'inherit',
-              lineHeight: '1.5',
-              maxHeight: '120px',
-              scrollbarWidth: 'none',
-              transition: 'border-color 0.2s',
-            }}
-            onFocus={e => e.target.style.borderColor = 'rgba(212,175,55,0.4)'}
-            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
-          />
-          <button
-            onClick={handleSend}
-            disabled={isLoading || !inputText.trim() || !!pendingRoll}
-            style={{
-              width: '44px', height: '44px',
-              borderRadius: '12px',
-              background: (isLoading || !inputText.trim() || !!pendingRoll)
-                ? 'rgba(255,255,255,0.05)'
-                : 'linear-gradient(135deg, #d4af37, #92670a)',
-              border: 'none',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: (isLoading || !inputText.trim() || !!pendingRoll) ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s',
-              flexShrink: 0,
-            }}
-          >
-            <Send size={18} color={isLoading || !inputText.trim() ? 'rgba(255,255,255,0.2)' : 'black'} />
-          </button>
+// ─── Slot UI Component ──────────────────────────────────────────────────
+function EquipmentSlotUI({ slot, label, icon, character, onSelect }: { slot: string; label: string; icon: React.ReactNode; character: any; onSelect: (s: string) => void }) {
+  const itemId = (character.equipment as any)?.[slot];
+  const item = (character.inventory || []).find((i: any) => i.id === itemId);
+
+  return (
+    <div 
+      onClick={() => onSelect(slot)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: '12px',
+        background: item ? 'rgba(212,175,55,0.08)' : 'rgba(0,0,0,0.3)',
+        border: `1px solid ${item ? 'var(--accent-gold)' : 'rgba(255,255,255,0.1)'}`,
+        borderRadius: '10px', padding: '10px', cursor: 'pointer', transition: 'all 0.2s'
+      }}
+    >
+      <div style={{ color: 'var(--accent-gold)', opacity: 0.6 }}>{icon}</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{label}</div>
+        <div style={{ fontSize: '13px', fontWeight: item ? 'bold' : 'normal', color: item ? 'white' : 'rgba(255,255,255,0.3)' }}>
+          {item ? item.name : 'Vacio'}
         </div>
-        <p style={{ textAlign: 'center', fontSize: '10px', color: 'var(--text-muted)', margin: '6px 0 0', opacity: 0.5 }}>
-          Enter para enviar · Shift+Enter para nueva línea
-        </p>
+      </div>
+    </div>
+  );
+}
+
+const SystemBubble = ({ text }: { text: string }) => (
+  <div style={{ alignSelf: 'center', margin: '20px 0', width: '100%', maxWidth: '600px' }}>
+    <div style={{ background: 'rgba(212, 175, 55, 0.05)', border: '1px dashed rgba(212, 175, 55, 0.3)', borderRadius: '8px', padding: '12px 20px', textAlign: 'center' }}>
+      <p style={{ margin: 0, fontSize: '13px', color: 'var(--accent-gold)', fontFamily: 'Georgia, serif', fontStyle: 'italic' }}>
+        {text}
+      </p>
+    </div>
+  </div>
+);
+
+const DmBubble = ({ text, isStreaming }: { text: string; isStreaming?: boolean }) => (
+  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', maxWidth: '85%' }}>
+    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '16px' }}>🎭</div>
+    <div className="glass-panel animate-fade-in" style={{ padding: '14px 18px', background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: '4px 16px 16px 16px' }}>
+      <p style={{ margin: 0, fontSize: '15px', lineHeight: '1.6', whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', fontFamily: 'Georgia, serif' }}>
+        {parseDiceTag(text)}
+        {isStreaming && <span className="streaming-cursor">|</span>}
+      </p>
+    </div>
+  </div>
+);
+
+const PlayerBubble = ({ text }: { text: string }) => (
+  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', alignSelf: 'flex-end', flexDirection: 'row-reverse', maxWidth: '85%' }}>
+    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--accent-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '18px', color: '#000' }}>👤</div>
+    <div className="glass-panel animate-fade-in" style={{ padding: '14px 18px', background: 'rgba(212, 175, 55, 0.1)', border: '1px solid rgba(212, 175, 55, 0.2)', borderRadius: '16px 4px 16px 16px' }}>
+      <p style={{ margin: 0, fontSize: '15px', lineHeight: '1.6', color: 'white', fontWeight: 500 }}>
+        {text}
+      </p>
+    </div>
+  </div>
+);
+
+function ItemPickupAlert({ name, category }: { name: string; category: string }) {
+  return (
+    <div className="item-pickup-alert" style={{ alignSelf: 'center', animation: 'slideUp 0.3s ease-out forwards' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--accent-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'black' }}>
+          <Package size={18} />
+        </div>
+        <div>
+          <div style={{ fontSize: '10px', color: 'var(--accent-gold)', fontWeight: 'bold', letterSpacing: '1px' }}>OBJETO ENCONTRADO</div>
+          <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{name}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DiceOverlay({ rollRequest, isRolling, result, onRoll }: { rollRequest: any; isRolling: boolean; result: any; onRoll: () => void }) {
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      animation: 'fadeIn 0.3s'
+    }}>
+      <div style={{
+        background: 'rgba(20, 20, 25, 0.95)', border: '1px solid var(--accent-gold)',
+        borderRadius: '24px', padding: '40px', maxWidth: '400px', width: '90%',
+        textAlign: 'center', boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
+      }}>
+        <div style={{ fontSize: '12px', color: 'var(--accent-gold)', letterSpacing: '2px', marginBottom: '10px' }}>DEMANDA DEL DESTINO</div>
+        <h2 style={{ fontSize: '32px', margin: '0 0 10px', fontFamily: 'var(--font-display)' }}>{rollRequest.formula}</h2>
+        <p style={{ color: 'var(--text-muted)', marginBottom: '30px' }}>Dificultad (CD): {rollRequest.dc}</p>
+        
+        {result ? (
+          <div style={{ marginBottom: '20px', animation: 'slideUp 0.3s' }}>
+            <div style={{ fontSize: '64px', fontWeight: 900, color: result.success ? '#4ade80' : '#ef4444' }}>{result.total}</div>
+            <div style={{ fontSize: '20px', color: result.success ? '#4ade80' : '#ef4444', fontWeight: 'bold' }}>
+              {result.success ? 'ÉXITO CRÍTICO' : 'FALLO TOTAL'}
+            </div>
+          </div>
+        ) : (
+          <button 
+            className="btn-primary" 
+            onClick={onRoll} 
+            disabled={isRolling}
+            style={{ width: '100%', py: '16px', fontSize: '18px' }}
+          >
+            {isRolling ? 'Lanzando...' : 'LANZAR DADOS'}
+          </button>
+        )}
       </div>
     </div>
   );
