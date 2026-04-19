@@ -12,6 +12,7 @@ import { SRD_SKILLS } from '../data/srd/skills';
 import { SRD_ALIGNMENTS } from '../data/srd/alignments';
 import { SRD_EQUIPMENT } from '../data/srd/equipment';
 import { ErrorBoundary } from '../components/CharacterCreatorComponents';
+import { calculateModifier, calculateAC } from '../utils/statsUtils';
 
 
 const ABILITY_MAP = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
@@ -69,7 +70,6 @@ export default function CharacterCreator() {
     return base + sub + flex;
   };
 
-  const calculateModifier = (val: number) => Math.floor((val - 10) / 2);
 
   // Point Buy Logic
   const increaseStat = (stat: AbilityKey) => {
@@ -156,15 +156,23 @@ export default function CharacterCreator() {
        const eq = SRD_EQUIPMENT[baseId];
        if (!eq) return;
 
-       const convertToItem = (template: any, q: number) => ({
+       const convertToItem = (template: any, q: number): import('../types/dnd').Item => ({
           id: crypto.randomUUID(),
           name: template.name,
           description: template.description || '',
-          type: template.category,
-          subtype: template.weaponType || template.armorType,
-          damage: template.damage ? `${template.damage.dice} ${template.damage.type}` : undefined,
+          category: template.category === 'weapon' ? 'equipamiento' : template.category === 'armor' ? 'equipamiento' : 'otro',
+          subtype: template.weaponType ? 'arma' : template.armorType === 'shield' ? 'escudo' : template.armorType ? 'armadura' : 'otro',
+          weaponType: template.weaponType,
+          armorType: template.armorType,
+          damage: template.damage,             // { dice, type } — structured
+          versatileDamage: template.versatileDamage,
+          acBase: template.acBase,
+          strRequirement: template.strRequirement,
+          stealthDisadvantage: template.stealthDisadvantage,
           properties: template.properties,
-          ac: template.acBase,
+          cost: template.cost,
+          weight: template.weight,
+          rarity: 'común',
           quantity: q
        });
 
@@ -215,6 +223,26 @@ export default function CharacterCreator() {
       ...(expertiseSkills.length > 0 ? [{ name: 'Pericia', description: `Competencia doble en: ${expertiseSkills.map(sk => SRD_SKILLS[sk]?.name || sk).join(', ')}.` }] : [])
     ];
 
+    // --- CA INICIAL CALCULADA DESDE EQUIPO (Cap. 5) ---
+
+    // Create a temporary character object to use with calculateAC
+    const tempChar: any = {
+      className: selectedClass.name,
+      subclass: selectedSubclass?.name,
+      attributes: finalStats,
+      inventory,
+      equipment: {}, // Initial equipment is empty, but calculateAC checks inventory if armor is found
+      features: extraFeatures
+    };
+    
+    // We need to simulate the equipment state for calculateAC
+    const startingArmor = inventory.find((it: any) => it.armorType && it.armorType !== 'shield');
+    const startingShield = inventory.find((it: any) => it.armorType === 'shield');
+    if (startingArmor) tempChar.equipment.torso = startingArmor.id;
+    if (startingShield) tempChar.equipment.offHand = startingShield.id;
+
+    const calculatedAC = calculateAC(tempChar);
+
     const newChar: Character = {
       id: crypto.randomUUID(),
       name: charName,
@@ -225,7 +253,7 @@ export default function CharacterCreator() {
       level: 1,
       hp: selectedClass.hitDie + calculateModifier(finalStats.con),
       maxHp: selectedClass.hitDie + calculateModifier(finalStats.con),
-      ac: 10 + calculateModifier(finalStats.dex),
+      ac: calculatedAC,
       attributes: finalStats as AbilityScores,
       background: selectedBackground.name,
       alignment: selectedAlignment as any,
@@ -243,7 +271,8 @@ export default function CharacterCreator() {
         skills: [...new Set(combinedSkills)] 
       },
       languages: [...(selectedRace.languages || ['Común']), ...flexibleLangs],
-      inventory
+      inventory,
+      equipment: tempChar.equipment
     };
 
     addCharacter(newChar);

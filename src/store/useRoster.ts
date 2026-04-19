@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Character, Item } from '../types/dnd';
+import { calculateAC } from '../utils/statsUtils';
 
 interface RosterState {
   characters: Character[];
@@ -106,7 +107,9 @@ export const useRoster = create<RosterState>()(
             (equipment as any)[targetSlot] = itemId;
           }
 
-          return { ...c, equipment };
+          const updatedChar = { ...c, equipment };
+          updatedChar.ac = calculateAC(updatedChar);
+          return updatedChar;
         });
         return { characters };
       }),
@@ -130,7 +133,9 @@ export const useRoster = create<RosterState>()(
           }
 
           (equipment as any)[slot] = itemId;
-          return { ...c, equipment };
+          const updatedChar = { ...c, equipment };
+          updatedChar.ac = calculateAC(updatedChar);
+          return updatedChar;
         })
       })),
     unequipItem: (charId, slot) =>
@@ -139,7 +144,9 @@ export const useRoster = create<RosterState>()(
           if (c.id !== charId || !c.equipment) return c;
           const equipment = { ...c.equipment };
           delete (equipment as any)[slot];
-          return { ...c, equipment };
+          const updatedChar = { ...c, equipment };
+          updatedChar.ac = calculateAC(updatedChar);
+          return updatedChar;
         })
       })),
     addXp: (charId, amount) =>

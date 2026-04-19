@@ -531,6 +531,13 @@ export default function AdventureView() {
                     <button onClick={() => removeItemFromCharacter(character!.id, item.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash size={14} /></button>
                   </div>
                   <p style={{ fontSize: '13px', color: 'var(--text-muted)', flex: 1 }}>{item.description}</p>
+                  
+                  {/* Cost and Weight (Cap. 5) */}
+                  <div style={{ display: 'flex', gap: '15px', fontSize: '11px', color: 'rgba(255,255,255,0.4)', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px' }}>
+                    <span>💰 {item.cost || 0} po</span>
+                    <span>⚖️ {item.weight || 0} lb</span>
+                  </div>
+
                   {item.category === 'equipamiento' && (
                     <button 
                       onClick={() => equipItem(character!.id, item.id)}
@@ -647,6 +654,9 @@ export default function AdventureView() {
 function EquipmentSlotUI({ slot, label, icon, character, onSelect }: { slot: string; label: string; icon: React.ReactNode; character: any; onSelect: (s: string) => void }) {
   const itemId = (character.equipment as any)?.[slot];
   const item = (character.inventory || []).find((i: any) => i.id === itemId);
+  
+  // STR Requirement check (Cap. 5)
+  const strReqFail = item?.strRequirement && character.attributes.str < item.strRequirement;
 
   return (
     <div 
@@ -654,17 +664,24 @@ function EquipmentSlotUI({ slot, label, icon, character, onSelect }: { slot: str
       style={{
         display: 'flex', alignItems: 'center', gap: '12px',
         background: item ? 'rgba(212,175,55,0.08)' : 'rgba(0,0,0,0.3)',
-        border: `1px solid ${item ? 'var(--accent-gold)' : 'rgba(255,255,255,0.1)'}`,
-        borderRadius: '10px', padding: '10px', cursor: 'pointer', transition: 'all 0.2s'
+        border: `1px solid ${strReqFail ? '#ef4444' : (item ? 'var(--accent-gold)' : 'rgba(255,255,255,0.1)')}`,
+        borderRadius: '10px', padding: '10px', cursor: 'pointer', transition: 'all 0.2s',
+        position: 'relative'
       }}
     >
-      <div style={{ color: 'var(--accent-gold)', opacity: 0.6 }}>{icon}</div>
+      <div style={{ color: strReqFail ? '#ef4444' : 'var(--accent-gold)', opacity: 0.6 }}>{icon}</div>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{label}</div>
         <div style={{ fontSize: '13px', fontWeight: item ? 'bold' : 'normal', color: item ? 'white' : 'rgba(255,255,255,0.3)' }}>
           {item ? item.name : 'Vacio'}
         </div>
+        {strReqFail && (
+          <div style={{ fontSize: '9px', color: '#fca5a5', fontWeight: 'bold', marginTop: '2px' }}>
+            ⚠️ REQUIERE FUE {item.strRequirement}
+          </div>
+        )}
       </div>
+      {strReqFail && <div style={{ position: 'absolute', top: '-5px', right: '-5px', background: '#ef4444', height: '10px', width: '100%', borderRadius: '4px', opacity: 0.1 }} />}
     </div>
   );
 }

@@ -49,9 +49,18 @@ export interface Item {
   name: string;
   category: 'equipamiento' | 'consumible' | 'otro';
   subtype?: 'arma' | 'armadura' | 'escudo' | 'casco' | 'guantes' | 'botas' | 'capa' | 'amuleto' | 'anillo' | 'otro';
-  properties?: string[]; // e.g., 'dos-manos', 'sutil', 'pesada', 'distancia'
+  weaponType?: string;           // 'simple_melee' | 'simple_ranged' | 'martial_melee' | 'martial_ranged'
+  armorType?: string;            // 'light' | 'medium' | 'heavy' | 'shield'
+  damage?: { dice: string; type: string };  // structured damage from SRD
+  versatileDamage?: string;      // damage dice when used two-handed (e.g. '1d10')
+  acBase?: number;               // base AC for armor
+  strRequirement?: number;       // STR needed to wear without penalty
+  stealthDisadvantage?: boolean; // armor imposes disadvantage on Stealth
+  properties?: string[];         // 'finesse', 'light', 'two-handed', 'reach', etc.
   description: string;
   rarity: 'común' | 'poco común' | 'raro' | 'muy raro' | 'legendario';
+  cost?: number;                 // value in GP
+  weight?: number;               // weight in lb
   quantity?: number;
 }
 
