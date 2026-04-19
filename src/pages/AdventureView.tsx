@@ -9,10 +9,10 @@ import { getAIProvider } from '../services/ai';
 import type { ChatMessage } from '../services/ai';
 import { extractRollRequest, rollDice } from '../utils/diceUtils';
 import type { RollResult, RollRequest } from '../utils/diceUtils';
-import { ADVENTURE_MODULES } from '../data/adventures';
-import { extractItemsFromText, cleanItemTags, extractXpFromText, extractFeaturesFromText } from '../utils/itemUtils';
-import { ShoppingBag, Sword as SwordIcon, Package, Trash, Shield, ShieldQuestion, Gem, CircleDot, Footprints, Hand, Shirt, HardHat, Waypoints } from 'lucide-react';
+import { ShoppingBag, Sword as SwordIcon, Package, Trash, Shield, ShieldQuestion, Gem, CircleDot, Footprints, Hand, Shirt, HardHat, Waypoints, Eye, ShieldAlert, Search } from 'lucide-react';
 import { SRD_FEATS } from '../data/srd/feats';
+import { SRD_SKILLS } from '../data/srd/skills';
+import { calculateSkillBonus, calculateSavingThrowBonus, calculatePassiveScore } from '../utils/statsUtils';
 
 // ─── AI Service (Now handled via .env) ───────────────────────────────────────
 
@@ -388,6 +388,16 @@ export default function AdventureView() {
                   <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
                     {character?.race} — {character?.classes.map(c => `${c.name} ${c.level}${c.subclass ? ` (${c.subclass})` : ''}`).join(' / ')}
                   </div>
+                  
+                  {/* Sentidos Pasivos (Cap. 7) */}
+                  <div style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
+                      <Eye size={12} /> <span style={{ color: 'var(--accent-gold)' }}>Percepción Pasiva: {calculatePassiveScore(character!, 'perception')}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
+                      <Search size={12} /> <span>Investigación Pasiva: {calculatePassiveScore(character!, 'investigation')}</span>
+                    </div>
+                  </div>
                 </div>
                 
                 {/* Level Up Button */}
@@ -424,7 +434,7 @@ export default function AdventureView() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 0.8fr) minmax(300px, 1fr) minmax(300px, 1.2fr)', gap: '30px' }}>
               {/* Stats Column */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
                 <div className="glass-panel" style={{ padding: '20px' }}>
@@ -438,6 +448,31 @@ export default function AdventureView() {
                           <div style={{ fontSize: '8px', color: colors[k], opacity: 0.7 }}>{(k as string).toUpperCase()}</div>
                           <div style={{ fontSize: '24px', fontFamily: 'var(--font-display)' }}>{v as number}</div>
                           <div style={{ color: colors[k], fontSize: '12px' }}>{m >= 0 ? `+${m}` : m}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Tiradas de Salvación (Cap. 7) */}
+                <div className="glass-panel" style={{ padding: '20px' }}>
+                  <p style={{ fontSize: '10px', color: 'var(--accent-gold)', letterSpacing: '1px', marginBottom: '15px', fontWeight: 'bold' }}>SALVACIONES</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    {(['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map(abi => {
+                      const bonus = calculateSavingThrowBonus(character!, abi);
+                      const isProf = character!.savingThrows.includes(abi);
+                      return (
+                        <div key={`save-${abi}`} style={{ 
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+                          padding: '8px 12px', background: isProf ? 'rgba(212,175,55,0.05)' : 'rgba(0,0,0,0.2)',
+                          border: isProf ? '1px solid rgba(212,175,55,0.2)' : '1px solid rgba(255,255,255,0.05)',
+                          borderRadius: '6px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: isProf ? 'var(--accent-gold)' : 'transparent', border: '1px solid rgba(255,255,255,0.2)' }}></div>
+                            <span style={{ fontSize: '11px', color: isProf ? 'white' : 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>{abi}</span>
+                          </div>
+                          <span style={{ fontSize: '14px', fontWeight: 'bold', color: isProf ? 'var(--accent-gold)' : 'white' }}>{bonus >= 0 ? `+${bonus}` : bonus}</span>
                         </div>
                       );
                     })}
@@ -495,6 +530,43 @@ export default function AdventureView() {
                   </div>
                 )}
               </div>
+
+              {/* Skills Column (Cap. 7) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                 <div className="glass-panel" style={{ padding: '20px' }}>
+                    <p style={{ fontSize: '10px', color: 'var(--accent-gold)', letterSpacing: '1px', marginBottom: '15px', fontWeight: 'bold' }}>HABILIDADES</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {Object.values(SRD_SKILLS).map(skill => {
+                        const bonus = calculateSkillBonus(character!, skill.id);
+                        const isProf = character!.proficiencies.skills.includes(skill.id);
+                        const isExp = character!.expertiseSkills?.includes(skill.id);
+                        
+                        return (
+                          <div key={skill.id} style={{ 
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+                            padding: '6px 12px', background: isProf ? 'rgba(251,191,36,0.03)' : 'transparent',
+                            borderRadius: '4px', borderBottom: '1px solid rgba(255,255,255,0.02)'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                               <div style={{ 
+                                 width: '8px', height: '8px', borderRadius: '50%', 
+                                 background: isExp ? 'var(--accent-gold)' : (isProf ? 'rgba(212,175,55,0.5)' : 'transparent'),
+                                 border: '1px solid rgba(255,255,255,0.2)',
+                                 boxShadow: isExp ? '0 0 8px var(--accent-gold)' : 'none'
+                               }} title={isExp ? 'Pericia' : (isProf ? 'Competencia' : 'Sin competencia')}></div>
+                               <span style={{ fontSize: '12px', color: isProf ? 'white' : 'rgba(255,255,255,0.4)' }}>{skill.name}</span>
+                               <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase' }}>({skill.ability})</span>
+                            </div>
+                            <span style={{ fontSize: '13px', fontWeight: 'bold', color: isProf ? 'var(--accent-gold)' : 'white' }}>
+                              {bonus >= 0 ? `+${bonus}` : bonus}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                 </div>
+              </div>
+
             </div>
 
             {/* ESPACIOS DE CONJURO (Cap. 6) */}

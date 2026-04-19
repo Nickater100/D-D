@@ -93,6 +93,7 @@ export interface Character {
   savingThrows: AbilityKey[];
   proficiencies: Proficiencies;
   languages: string[];
+  expertiseSkills?: string[]; // list of skill IDs with double proficiency bonus
 
   // Features, Spells & Feats
   feats?: string[]; // list of feat IDs

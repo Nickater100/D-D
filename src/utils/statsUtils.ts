@@ -1,4 +1,5 @@
 import type { Character } from '../types/dnd';
+import { SRD_SKILLS } from '../data/srd/skills';
 
 /**
  * Calculates the ability modifier for a given score.
@@ -67,4 +68,45 @@ export function calculateAC(character: Character): number {
   }
 
   return baseAC;
+}
+
+/**
+ * Calculates the total bonus for a skill.
+ * Mod + Proficiency (if applicable) + Expertise (if applicable)
+ */
+export function calculateSkillBonus(character: Character, skillId: string): number {
+  const skill = SRD_SKILLS[skillId];
+  if (!skill) return 0;
+
+  const abilityScore = character.attributes[skill.ability];
+  const mod = calculateModifier(abilityScore);
+  const isProficient = character.proficiencies.skills.includes(skillId);
+  const isExpert = character.expertiseSkills?.includes(skillId);
+
+  let bonus = mod;
+  if (isProficient) bonus += character.proficiencyBonus;
+  if (isExpert) bonus += character.proficiencyBonus; // Double proficiency
+
+  return bonus;
+}
+
+/**
+ * Calculates the total bonus for a saving throw.
+ */
+export function calculateSavingThrowBonus(character: Character, ability: keyof typeof character.attributes): number {
+  const mod = calculateModifier(character.attributes[ability]);
+  const isProficient = character.savingThrows.includes(ability);
+
+  let bonus = mod;
+  if (isProficient) bonus += character.proficiencyBonus;
+
+  return bonus;
+}
+
+/**
+ * Calculates passive sense scores (e.g. Passive Perception).
+ * Base 10 + Skill Bonus.
+ */
+export function calculatePassiveScore(character: Character, skillId: string): number {
+  return 10 + calculateSkillBonus(character, skillId);
 }

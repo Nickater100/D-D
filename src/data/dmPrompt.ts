@@ -1,5 +1,7 @@
 import type { Character } from '../types/dnd';
 import type { AdventureModule } from './adventures';
+import { SRD_SKILLS } from './srd/skills';
+import { calculateSkillBonus, calculateSavingThrowBonus, calculatePassiveScore } from '../utils/statsUtils';
 
 // Helper to compute ability modifier
 const mod = (score: number) => {
@@ -24,6 +26,17 @@ export function buildSystemPrompt(character: Character, module?: AdventureModule
   const inventory = character.inventory?.length 
     ? character.inventory.map(i => `- ${i.name} (${i.category}): ${i.description}`).join('\n')
     : 'El inventario está vacío.';
+
+  const saves = (['str', 'dex', 'con', 'int', 'wis', 'cha'] as const)
+    .map(abi => `${STAT_NAMES[abi]}: ${calculateSavingThrowBonus(character, abi) >= 0 ? '+' : ''}${calculateSavingThrowBonus(character, abi)}`)
+    .join(', ');
+
+  const skillList = Object.values(SRD_SKILLS)
+    .map(s => {
+      const b = calculateSkillBonus(character, s.id);
+      return `${s.name}: ${b >= 0 ? '+' : ''}${b}`;
+    })
+    .join(', ');
 
   const getEquipped = (slot: string) => {
     const id = (character.equipment as any)?.[slot];
@@ -67,6 +80,16 @@ Clase Armad.: ${character.ac}
 
 ATRIBUTOS:
 ${attrs}
+
+SALVACIONES:
+${saves}
+
+HABILIDADES:
+${skillList}
+
+SENTIDOS PASIVOS:
+- Percepción Pasiva: ${calculatePassiveScore(character, 'perception')}
+- Investigación Pasiva: ${calculatePassiveScore(character, 'investigation')}
 
 RASGOS RACIALES Y DE TRASFONDO:
 ${features}

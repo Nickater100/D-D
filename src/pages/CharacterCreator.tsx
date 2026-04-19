@@ -276,6 +276,7 @@ export default function CharacterCreator() {
         skills: [...new Set(combinedSkills)] 
       },
       languages: [...(selectedRace.languages || ['Común']), ...flexibleLangs],
+      expertiseSkills,
       inventory,
       equipment: tempChar.equipment
     };
