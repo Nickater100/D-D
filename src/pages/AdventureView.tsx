@@ -5,13 +5,16 @@ import { useRoster } from '../store/useRoster';
 import { useGameSession } from '../store/useGameSession';
 import { buildSystemPrompt } from '../data/dmPrompt';
 import { STARTER_SPELLS } from '../data/spells_es';
+import { ADVENTURE_MODULES } from '../data/adventures';
+import type { AdventureModule } from '../data/adventures';
 import { getAIProvider } from '../services/ai';
 import type { ChatMessage } from '../services/ai';
 import { extractRollRequest, rollDice } from '../utils/diceUtils';
 import type { RollResult, RollRequest } from '../utils/diceUtils';
-import { ShoppingBag, Sword as SwordIcon, Package, Trash, Shield, ShieldQuestion, Gem, CircleDot, Footprints, Hand, Shirt, HardHat, Waypoints, Eye, ShieldAlert, Search } from 'lucide-react';
+import { ShoppingBag, Sword as SwordIcon, Package, Trash, Shield, ShieldQuestion, Gem, CircleDot, Footprints, Hand, Shirt, HardHat, Waypoints, Eye, ShieldAlert, Search, Flame, Moon, Activity, AlertTriangle } from 'lucide-react';
 import { SRD_FEATS } from '../data/srd/feats';
 import { SRD_SKILLS } from '../data/srd/skills';
+import { SRD_CONDITIONS } from '../data/srd/conditions';
 import { calculateSkillBonus, calculateSavingThrowBonus, calculatePassiveScore } from '../utils/statsUtils';
 
 // ─── AI Service (Now handled via .env) ───────────────────────────────────────
@@ -49,8 +52,13 @@ export default function AdventureView() {
   const [inventoryTab, setInventoryTab] = useState<'equipamiento' | 'consumible' | 'otro'>('equipamiento');
   const [newItemsAlert, setNewItemsAlert] = useState<any[]>([]);
   const [slotSelection, setSlotSelection] = useState<string | null>(null);
+  const [showRestModal, setShowRestModal] = useState(false);
 
-  const { addItemToCharacter, removeItemFromCharacter, equipItem, equipItemInSlot, unequipItem, addXp, addFeatureToCharacter, levelUp } = useRoster();
+  const { 
+    addItemToCharacter, removeItemFromCharacter, equipItem, 
+    equipItemInSlot, unequipItem, addXp, addFeatureToCharacter, 
+    levelUp, longRest, shortRest, removeCondition: removeConditionByStore 
+  } = useRoster();
 
   const character = characters.find(c => c.id === activeCharacterId);
   const activeModule = ADVENTURE_MODULES.find(m => m.id === activeModuleId);
@@ -398,23 +406,65 @@ export default function AdventureView() {
                       <Search size={12} /> <span>Investigación Pasiva: {calculatePassiveScore(character!, 'investigation')}</span>
                     </div>
                   </div>
+
+                  {/* Conditions & Exhaustion Display (Cap. 8) */}
+                  <div style={{ display: 'flex', gap: '8px', mt: '12px', flexWrap: 'wrap', marginTop: '10px' }}>
+                    {character?.exhaustion && character.exhaustion > 0 ? (
+                      <div style={{ 
+                        display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', 
+                        background: 'rgba(239,68,68,0.1)', border: '1px solid #ef4444', 
+                        borderRadius: '4px', fontSize: '10px', color: '#fca5a5' 
+                      }}>
+                        <AlertTriangle size={10} /> AGOTAMIENTO {character.exhaustion}
+                      </div>
+                    ) : null}
+                    {character?.conditions?.map(cId => {
+                      const cData = SRD_CONDITIONS[cId];
+                      return (
+                        <div key={cId} style={{ 
+                          display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', 
+                          background: 'rgba(168,85,247,0.1)', border: '1px solid #a855f7', 
+                          borderRadius: '4px', fontSize: '10px', color: '#d8b4fe' 
+                        }} title={cData?.description}>
+                          <Activity size={10} /> {cData?.name || cId}
+                          <button onClick={() => removeConditionByStore(character.id, cId)} style={{ background: 'none', border: 'none', color: 'white', opacity: 0.5, cursor: 'pointer', marginLeft: '4px' }}>×</button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
                 
-                {/* Level Up Button */}
-                {character && (character.xp || 0) >= (XP_LEVELS[character.level + 1] || Infinity) && (
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  {/* Rest Button (Cap. 8) */}
                   <button 
-                    onClick={() => levelUp(character.id)}
-                    className="animate-pulse"
+                    onClick={() => setShowRestModal(true)}
+                    className="glass-button"
                     style={{ 
-                      background: 'linear-gradient(45deg, #d4af37, #f1c40f)', color: 'black', 
-                      border: 'none', padding: '12px 24px', borderRadius: '8px', 
-                      fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 0 20px rgba(212,175,55,0.4)',
-                      fontSize: '14px'
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      padding: '10px 20px', borderRadius: '8px', fontSize: '14px', 
+                      background: 'rgba(212,175,55,0.1)', border: '1px solid var(--accent-gold)', 
+                      color: 'var(--accent-gold)', cursor: 'pointer' 
                     }}
                   >
-                    ✨ ¡SUBIR DE NIVEL!
+                    <Flame size={16} /> Descansar
                   </button>
-                )}
+
+                  {/* Level Up Button */}
+                  {character && (character.xp || 0) >= (XP_LEVELS[character.level + 1] || Infinity) && (
+                    <button 
+                      onClick={() => levelUp(character.id)}
+                      className="animate-pulse"
+                      style={{ 
+                        background: 'linear-gradient(45deg, #d4af37, #f1c40f)', color: 'black', 
+                        border: 'none', padding: '12px 24px', borderRadius: '8px', 
+                        fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 0 20px rgba(212,175,55,0.4)',
+                        fontSize: '14px'
+                      }}
+                    >
+                      ✨ ¡SUBIR DE NIVEL!
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* XP Progress */}
@@ -489,6 +539,24 @@ export default function AdventureView() {
                     <div style={{ fontSize: '9px', color: '#93c5fd' }}>CLASE DE ARMADURA</div>
                     <div style={{ fontSize: '24px', color: 'white' }}>{character?.ac}</div>
                   </div>
+                </div>
+
+                {/* Dados de Golpe (Cap. 8) */}
+                <div className="glass-panel" style={{ padding: '20px' }}>
+                   <p style={{ fontSize: '10px', color: 'var(--accent-gold)', letterSpacing: '1px', marginBottom: '15px', fontWeight: 'bold' }}>DADOS DE GOLPE</p>
+                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                      {character?.hitDice?.map((hd, i) => (
+                        <div key={i} style={{ 
+                          flex: 1, minWidth: '100px', padding: '10px', 
+                          background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', 
+                          borderRadius: '8px', textAlign: 'center'
+                        }}>
+                          <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.4)', marginBottom: '5px' }}>D{hd.type}</div>
+                          <div style={{ fontSize: '20px', color: 'white' }}>{hd.current} / {hd.max}</div>
+                        </div>
+                      ))}
+                      {!character?.hitDice?.length && <div style={{ fontSize: '12px', opacity: 0.3 }}>No hay dados disponibles.</div>}
+                   </div>
                 </div>
               </div>
 
@@ -753,7 +821,6 @@ export default function AdventureView() {
         )}
       </main>
 
-      {/* ─── DICE OVERLAY ────────────────────────────────────────────────── */}
       {pendingRoll && (
         <DiceOverlay 
           rollRequest={pendingRoll} 
@@ -761,6 +828,77 @@ export default function AdventureView() {
           result={rollResult}
           onRoll={handleRoll}
         />
+      )}
+
+      {/* REST MODAL (Cap. 8) */}
+      {showRestModal && character && (
+        <div style={{ 
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)',
+          zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+        }}>
+          <div className="glass-panel animate-scale-in" style={{ maxWidth: '500px', width: '100%', padding: '30px' }}>
+            <h2 className="font-display text-2xl text-gold mb-2 text-center">EL CAMPAMENTO</h2>
+            <p className="text-secondary text-sm text-center mb-6">¿Qué tipo de descanso realizarán los héroes?</p>
+            
+            <div className="flex-col gap-4">
+              {/* Opción Descanso Corto */}
+              <button 
+                onClick={() => {
+                  const hd = character.hitDice?.find(d => d.current > 0);
+                  if (hd) {
+                    shortRest(character.id, hd.type, 1);
+                    addMessage({ role: 'system', text: `Has realizado un Descanso Corto. Usas un dado de golpe d${hd.type} para recuperar fuerzas.` });
+                  } else {
+                    alert('No te quedan dados de golpe.');
+                  }
+                  setShowRestModal(false);
+                }}
+                className="glass-button w-full p-4 text-left group"
+                style={{ background: 'rgba(212,175,55,0.05)', borderColor: 'rgba(212,175,55,0.2)' }}
+              >
+                <div className="flex gap-4 items-center">
+                  <div className="p-3 rounded-lg bg-yellow-500/10 text-yellow-500 group-hover:scale-110 transition-transform">
+                    <Flame size={24} />
+                  </div>
+                  <div>
+                    <div className="font-bold text-white uppercase tracking-wider">Descanso Corto (1 hora)</div>
+                    <div className="text-xs text-secondary">Consume 1 Dado de Golpe para curarte. Los brujos recuperan sus pactos mágicos.</div>
+                  </div>
+                </div>
+              </button>
+
+              {/* Opción Descanso Largo */}
+              <button 
+                onClick={() => {
+                  longRest(character.id);
+                  addMessage({ role: 'system', text: 'Realizas un Descanso Largo bajo la protección de la noche. Recuperas HP, Conjuros y 1 nivel de Agotamiento.' });
+                  setShowRestModal(false);
+                }}
+                className="glass-button w-full p-4 text-left group"
+                style={{ background: 'rgba(34,197,94,0.05)', borderColor: 'rgba(34,197,94,0.2)' }}
+              >
+                <div className="flex gap-4 items-center">
+                  <div className="p-3 rounded-lg bg-green-500/10 text-green-500 group-hover:scale-110 transition-transform">
+                    <Moon size={24} />
+                  </div>
+                  <div>
+                    <div className="font-bold text-white uppercase tracking-wider">Descanso Largo (8 horas)</div>
+                    <div className="text-xs text-secondary">Recuperas todos tus PG, todos tus Conjuros y la mitad de tus Dados de Golpe.</div>
+                  </div>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => setShowRestModal(false)}
+                className="w-full mt-4 text-secondary text-xs uppercase letter-spacing-1 hover:text-white transition-colors"
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import type { Character } from '../types/dnd';
 import type { AdventureModule } from './adventures';
 import { SRD_SKILLS } from './srd/skills';
+import { SRD_CONDITIONS } from './srd/conditions';
 import { calculateSkillBonus, calculateSavingThrowBonus, calculatePassiveScore } from '../utils/statsUtils';
 
 // Helper to compute ability modifier
@@ -37,6 +38,17 @@ export function buildSystemPrompt(character: Character, module?: AdventureModule
       return `${s.name}: ${b >= 0 ? '+' : ''}${b}`;
     })
     .join(', ');
+
+  const currentConditions = character.conditions?.length 
+    ? character.conditions.map(cId => {
+        const c = SRD_CONDITIONS[cId];
+        return `- ${c?.name || cId}: ${c?.description} (Efectos: ${c?.effects.join(', ') || 'Varios'})`;
+      }).join('\n')
+    : 'Ninguna.';
+
+  const exhaustionEffect = character.exhaustion > 0
+    ? `Nivel ${character.exhaustion}: Aplica un penalizador de -${character.exhaustion * 2} a todas las tiradas de d20 (ataques, habilidades, salvaciones).`
+    : 'Sin agotamiento.';
 
   const getEquipped = (slot: string) => {
     const id = (character.equipment as any)?.[slot];
@@ -90,6 +102,11 @@ ${skillList}
 SENTIDOS PASIVOS:
 - Percepción Pasiva: ${calculatePassiveScore(character, 'perception')}
 - Investigación Pasiva: ${calculatePassiveScore(character, 'investigation')}
+
+ESTADO FÍSICO Y CONDICIONES (Cap. 8):
+- Agotamiento: ${exhaustionEffect}
+- Condiciones Activas:
+${currentConditions}
 
 RASGOS RACIALES Y DE TRASFONDO:
 ${features}

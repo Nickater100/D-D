@@ -102,9 +102,17 @@ export interface Character {
   warlockSlots?: { count: number, level: number }; // Pact Magic
   features?: Feature[]; // Used for both class features and narrative consequences
   
-  // Inventory
   inventory?: Item[];
   equipment?: Partial<Record<EquipmentSlot, string>>; // Maps slot to Item ID
+
+  // Adventuring (Cap. 8)
+  exhaustion: number; // 0 to 6
+  conditions: string[]; // list of condition IDs
+  hitDice: {
+    type: number;   // e.g. 8 for d8
+    current: number;
+    max: number;
+  }[];
 }
 
 export interface Campaign {

@@ -278,7 +278,14 @@ export default function CharacterCreator() {
       languages: [...(selectedRace.languages || ['Común']), ...flexibleLangs],
       expertiseSkills,
       inventory,
-      equipment: tempChar.equipment
+      equipment: tempChar.equipment,
+      
+      // Adventuring (Cap. 8)
+      exhaustion: 0,
+      conditions: [],
+      hitDice: [
+        { type: selectedClass.hitDie, current: 1, max: 1 }
+      ]
     };
 
     addCharacter(newChar);
