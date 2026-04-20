@@ -113,6 +113,7 @@ export interface Character {
     current: number;
     max: number;
   }[];
+  deathSaves?: { success: number; failure: number };
 }
 
 export interface CombatEntity {

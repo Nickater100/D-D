@@ -26,6 +26,9 @@ interface RosterState {
   removeCondition: (charId: string, conditionId: string) => void;
   setExhaustion: (charId: string, level: number) => void;
   updateHp: (charId: string, amount: number) => void;
+  addDeathSaveSuccess: (charId: string) => void;
+  addDeathSaveFailure: (charId: string, amount: number) => void;
+  resetDeathSaves: (charId: string) => void;
 }
 
 export const useRoster = create<RosterState>()(
@@ -306,8 +309,41 @@ export const useRoster = create<RosterState>()(
 
     updateHp: (charId, amount) =>
       set((state) => ({
+        characters: state.characters.map((c) => {
+          if (c.id !== charId) return c;
+          const newHp = Math.max(0, Math.min(c.maxHp, (c.hp || 0) + amount));
+          // Reset death saves if healing from 0
+          const shouldReset = c.hp === 0 && newHp > 0;
+          return { 
+            ...c, 
+            hp: newHp,
+            deathSaves: shouldReset ? { success: 0, failure: 0 } : c.deathSaves
+          };
+        }),
+      })),
+
+    addDeathSaveSuccess: (charId) =>
+      set((state) => ({
+        characters: state.characters.map((c) => {
+          if (c.id !== charId) return c;
+          const current = c.deathSaves || { success: 0, failure: 0 };
+          return { ...c, deathSaves: { ...current, success: Math.min(3, current.success + 1) } };
+        }),
+      })),
+
+    addDeathSaveFailure: (charId, amount) =>
+      set((state) => ({
+        characters: state.characters.map((c) => {
+          if (c.id !== charId) return c;
+          const current = c.deathSaves || { success: 0, failure: 0 };
+          return { ...c, deathSaves: { ...current, failure: Math.min(3, current.failure + amount) } };
+        }),
+      })),
+
+    resetDeathSaves: (charId) =>
+      set((state) => ({
         characters: state.characters.map((c) =>
-          c.id === charId ? { ...c, hp: Math.max(0, Math.min(c.maxHp, (c.hp || 0) + amount)) } : c
+          c.id === charId ? { ...c, deathSaves: { success: 0, failure: 0 } } : c
         ),
       })),
     }),

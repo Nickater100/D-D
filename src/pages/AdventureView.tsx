@@ -34,7 +34,7 @@ export default function AdventureView() {
   const { characters, activeCharacterId } = useRoster();
   const { 
     sessions, currentSessionId, isLoading, addMessage, setLoading,
-    startCombat, endCombat, nextTurn, damageEntity 
+    startCombat, endCombat, nextTurn, damageEntity, deleteSession 
   } = useGameSession();
 
   const currentSession = currentSessionId ? sessions[currentSessionId] : null;
@@ -65,7 +65,7 @@ export default function AdventureView() {
     addItemToCharacter, removeItemFromCharacter, equipItem, 
     equipItemInSlot, unequipItem, addXp, addFeatureToCharacter, 
     levelUp, longRest, shortRest, removeCondition: removeConditionByStore,
-    updateHp 
+    updateHp, addDeathSaveSuccess, addDeathSaveFailure, resetDeathSaves 
   } = useRoster();
 
   const character = characters.find(c => c.id === activeCharacterId);
@@ -258,6 +258,58 @@ export default function AdventureView() {
     sendMessage(systemMsg);
   };
 
+  // ─── Death Saving Throws (Cap. 9) ──────────────────────────────────────────
+  const handleDeathSave = async () => {
+    if (!character || character.hp > 0 || isRolling) return;
+    
+    setIsRolling(true);
+    // Use the dice rolling system for visual feedback
+    const roll = { formula: '1d20', dc: 10 }; 
+    await new Promise(r => setTimeout(r, 1000));
+    const result = { 
+      total: Math.floor(Math.random() * 20) + 1,
+      dice: 0, modifier: 0, isCritical: false, isFumble: false
+    };
+    result.isCritical = result.total === 20;
+    result.isFumble = result.total === 1;
+    
+    setRollResult({ ...result, formula: '1d20', dice: result.total, modifier: 0 });
+    await new Promise(r => setTimeout(r, 1000));
+
+    if (result.isCritical) {
+      updateHp(character.id, 1);
+      addMessage({ role: 'system', text: `✨ ¡20 NATURAL! Te recuperas con 1 HP y vuelves a la consciencia.` });
+    } else if (result.isFumble) {
+      addDeathSaveFailure(character.id, 2);
+      addMessage({ role: 'system', text: `💀 ¡PIFIA! 2 fallos en salvaciones de muerte.` });
+    } else if (result.total >= 10) {
+      addDeathSaveSuccess(character.id);
+      addMessage({ role: 'system', text: `✅ Éxito en salvación de muerte (${result.total}).` });
+    } else {
+      addDeathSaveFailure(character.id, 1);
+      addMessage({ role: 'system', text: `❌ Fracaso en salvación de muerte (${result.total}).` });
+    }
+
+    setIsRolling(false);
+    setRollResult(null);
+    nextTurn();
+  };
+
+  // Victory Detection
+  const allEnemiesDead = encounter?.isActive && encounter.entities.filter(e => !e.isPlayer).every(e => e.hp <= 0);
+
+  // Permadeath Check
+  useEffect(() => {
+    if (character?.deathSaves && character.deathSaves.failure >= 3 && currentSessionId) {
+      // Trigger deletion after a small delay for dramatic effect
+      const timer = setTimeout(() => {
+        deleteSession(currentSessionId);
+        navigate('/campaigns');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [character?.deathSaves?.failure, currentSessionId, deleteSession, navigate]);
+
   // ─── AI Combat Turn Trigger (Cap. 9) ───────────────────────────────────────
   useEffect(() => {
     if (!encounter?.isActive || isPlayerTurn || isLoading || !currentTurnEntity) return;
@@ -339,6 +391,24 @@ export default function AdventureView() {
       display: 'flex', flexDirection: 'column',
       color: 'white', overflow: 'hidden'
     }}>
+      {/* Permadeath Overlay (Global) */}
+      {character && character.deathSaves && character.deathSaves.failure >= 3 && (
+        <div style={{ 
+          position: 'fixed', inset: 0, zIndex: 10000, 
+          background: 'rgba(0,0,0,0.98)', display: 'flex', flexDirection: 'column', 
+          alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '40px'
+        }}>
+          <div style={{ fontSize: '100px', marginBottom: '20px', animation: 'pulse 2s infinite' }}>💀</div>
+          <h1 style={{ fontSize: '56px', color: '#ef4444', fontFamily: 'var(--font-display)', marginBottom: '10px', letterSpacing: '4px' }}>TU HISTORIA HA TERMINADO</h1>
+          <p style={{ fontSize: '20px', color: 'rgba(255,255,255,0.6)', maxWidth: '600px', lineHeight: '1.6' }}>
+            Has sucumbido ante tus heridas en las profundidades de la aventura. <br />
+            Siguiendo las leyes del <strong>Destino Brutal</strong>, esta campaña ha sido borrada permanentemente.
+          </p>
+          <div style={{ marginTop: '50px', fontSize: '14px', color: '#ef4444', opacity: 0.8, letterSpacing: '3px', fontWeight: 'bold' }}>
+            BORRANDO REGISTROS DE CAMPAÑA...
+          </div>
+        </div>
+      )}
       {/* ─── MAIN HEADER / NAVIGATION ────────────────────────────────────────── */}
       <header style={{
         height: '60px', borderBottom: '1px solid rgba(255,255,255,0.1)',
@@ -500,8 +570,9 @@ export default function AdventureView() {
                   <div style={{ fontSize: '10px', color: isPlayerTurn ? 'var(--accent-gold)' : '#f87171', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase' }}>
                     {isPlayerTurn ? '🔧 TUS ACCIONES' : `⏳ TURNO DE ${currentTurnEntity?.name?.toUpperCase()}`}
                   </div>
+                  
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {isPlayerTurn && character?.inventory?.filter(i => (character.equipment as any)?.mainHand === i.id || (character.equipment as any)?.ranged === i.id).map(weapon => (
+                    {isPlayerTurn && character && character.hp > 0 && character.inventory?.filter(i => (character.equipment as any)?.mainHand === i.id || (character.equipment as any)?.ranged === i.id).map(weapon => (
                       <button
                         key={weapon.id}
                         disabled={!selectedTargetId || isLoading}
@@ -512,15 +583,57 @@ export default function AdventureView() {
                         ⚔️ Atacar con {weapon.name} {selectedTargetId ? '' : '(Selecciona Objetivo)'}
                       </button>
                     ))}
+
+                    {/* Death Save Button */}
+                    {isPlayerTurn && character && character.hp === 0 && (character.deathSaves?.failure || 0) < 3 && (character.deathSaves?.success || 0) < 3 && (
+                      <button
+                        onClick={handleDeathSave}
+                        disabled={isRolling}
+                        className="glass-button"
+                        style={{ padding: '8px 15px', fontSize: '12px', borderColor: '#ef4444', color: '#f87171', fontWeight: 'bold' }}
+                      >
+                        🎲 Realizar Salvación de Muerte
+                      </button>
+                    )}
+
+                    {/* Victory Button */}
+                    {allEnemiesDead && (
+                      <button
+                        onClick={() => endCombat()}
+                        className="glass-button"
+                        style={{ padding: '8px 15px', fontSize: '12px', borderColor: 'var(--accent-gold)', color: 'var(--accent-gold)', fontWeight: 'bold' }}
+                      >
+                        🏆 Finalizar Combate (Victoria)
+                      </button>
+                    )}
+
                     <button 
                       onClick={() => nextTurn()} 
-                      disabled={isLoading}
+                      disabled={isLoading || (isPlayerTurn && character?.hp === 0 && (character?.deathSaves?.success || 0) < 3)}
                       className="glass-button" 
                       style={{ padding: '8px 12px', fontSize: '11px', background: 'rgba(255,255,255,0.05)', borderColor: isPlayerTurn ? 'var(--accent-gold)' : 'rgba(255,255,255,0.2)' }}
                     >
                       ⏩ {isPlayerTurn ? 'Finalizar Turno' : 'Siguiente Combate'}
                     </button>
                   </div>
+
+                  {/* Death Saves Counters */}
+                  {character && character.hp === 0 && (
+                    <div style={{ display: 'flex', gap: '20px', marginTop: '10px', padding: '10px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '10px', color: '#4ade80' }}>ÉXITOS:</span>
+                        {[1, 2, 3].map(i => (
+                          <div key={i} style={{ width: '10px', height: '10px', borderRadius: '50%', border: '1px solid #4ade80', background: (character.deathSaves?.success || 0) >= i ? '#4ade80' : 'transparent' }} />
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '10px', color: '#f87171' }}>FALLOS:</span>
+                        {[1, 2, 3].map(i => (
+                          <div key={i} style={{ width: '10px', height: '10px', borderRadius: '50%', border: '1px solid #f87171', background: (character.deathSaves?.failure || 0) >= i ? '#f87171' : 'transparent' }} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

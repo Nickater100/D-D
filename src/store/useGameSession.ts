@@ -162,13 +162,26 @@ export const useGameSession = create<GameSessionState>()(
           if (!session?.encounter) return state;
 
           const { turnIndex, entities, round } = session.encounter;
-          let nextIndex = turnIndex + 1;
+          let nextIndex = turnIndex;
           let nextRound = round;
+          let foundNext = false;
 
-          if (nextIndex >= entities.length) {
-            nextIndex = 0;
-            nextRound += 1;
+          // Find next conscious combatant
+          for (let i = 1; i <= entities.length; i++) {
+            const checkIndex = (turnIndex + i) % entities.length;
+            const entity = entities[checkIndex];
+            
+            // Player always gets a turn (even at 0 HP for death saves)
+            // Enemies only get a turn if they have HP > 0
+            if (entity.isPlayer || entity.hp > 0) {
+              nextIndex = checkIndex;
+              if (checkIndex < turnIndex) nextRound += 1;
+              foundNext = true;
+              break;
+            }
           }
+
+          if (!foundNext) return state; // Should not happen if encounter is active
 
           const updatedSession: GameSession = {
             ...session,
