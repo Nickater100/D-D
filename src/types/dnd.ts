@@ -115,6 +115,24 @@ export interface Character {
   }[];
 }
 
+export interface CombatEntity {
+  id: string;
+  name: string;
+  hp: number;
+  maxHp: number;
+  ac: number;
+  initiative: number;
+  isPlayer: boolean;
+  type?: 'enemy' | 'ally' | 'neutral';
+}
+
+export interface CombatEncounter {
+  isActive: boolean;
+  turnIndex: number;
+  round: number;
+  entities: CombatEntity[];
+}
+
 export interface Campaign {
   id: string;
   title: string;

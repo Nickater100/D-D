@@ -25,6 +25,7 @@ interface RosterState {
   addCondition: (charId: string, conditionId: string) => void;
   removeCondition: (charId: string, conditionId: string) => void;
   setExhaustion: (charId: string, level: number) => void;
+  updateHp: (charId: string, amount: number) => void;
 }
 
 export const useRoster = create<RosterState>()(
@@ -301,6 +302,13 @@ export const useRoster = create<RosterState>()(
         characters: state.characters.map((c) =>
           c.id === charId ? { ...c, exhaustion: Math.min(6, Math.max(0, level)) } : c
         )
+      })),
+
+    updateHp: (charId, amount) =>
+      set((state) => ({
+        characters: state.characters.map((c) =>
+          c.id === charId ? { ...c, hp: Math.max(0, Math.min(c.maxHp, (c.hp || 0) + amount)) } : c
+        ),
       })),
     }),
     {

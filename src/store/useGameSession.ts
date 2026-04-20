@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { CombatEncounter, CombatEntity } from '../types/dnd';
 
 export interface ChatMessage {
   role: 'user' | 'model' | 'system';
@@ -14,6 +15,7 @@ export interface GameSession {
   moduleId: string | null;
   messages: ChatMessage[];
   updatedAt: number;
+  encounter?: CombatEncounter;
 }
 
 interface GameSessionState {
@@ -28,6 +30,12 @@ interface GameSessionState {
   addMessage: (msg: Omit<ChatMessage, 'timestamp'>) => void;
   setLoading: (v: boolean) => void;
   clearCurrentSession: () => void;
+
+  // Combat Actions
+  startCombat: (player: CombatEntity, enemies: Omit<CombatEntity, 'id' | 'initiative' | 'isPlayer'>[]) => void;
+  nextTurn: () => void;
+  damageEntity: (entityId: string, amount: number) => void;
+  endCombat: () => void;
 }
 
 export const useGameSession = create<GameSessionState>()(
@@ -106,6 +114,125 @@ export const useGameSession = create<GameSessionState>()(
       setLoading: (v) => set({ isLoading: v }),
 
       clearCurrentSession: () => set({ currentSessionId: null, isLoading: false }),
+
+      startCombat: (player, enemies) => {
+        const currentId = get().currentSessionId;
+        if (!currentId) return;
+
+        // Roll initiatives
+        const roll = (mod: number = 0) => Math.floor(Math.random() * 20) + 1 + mod;
+
+        const combatants: CombatEntity[] = [
+          { ...player, initiative: roll() }, // Assuming dex mod is already in roll result or passed
+          ...enemies.map((e, index) => ({
+            ...e,
+            id: `enemy-${index}-${Date.now()}`,
+            isPlayer: false,
+            initiative: roll(),
+            type: 'enemy' as const
+          }))
+        ].sort((a, b) => b.initiative - a.initiative);
+
+        set((state) => {
+          const session = state.sessions[currentId];
+          if (!session) return state;
+
+          const updatedSession: GameSession = {
+            ...session,
+            encounter: {
+              isActive: true,
+              turnIndex: 0,
+              round: 1,
+              entities: combatants
+            }
+          };
+
+          return {
+            sessions: { ...state.sessions, [currentId]: updatedSession }
+          };
+        });
+      },
+
+      nextTurn: () => {
+        const currentId = get().currentSessionId;
+        if (!currentId) return;
+
+        set((state) => {
+          const session = state.sessions[currentId];
+          if (!session?.encounter) return state;
+
+          const { turnIndex, entities, round } = session.encounter;
+          let nextIndex = turnIndex + 1;
+          let nextRound = round;
+
+          if (nextIndex >= entities.length) {
+            nextIndex = 0;
+            nextRound += 1;
+          }
+
+          const updatedSession: GameSession = {
+            ...session,
+            encounter: {
+              ...session.encounter,
+              turnIndex: nextIndex,
+              round: nextRound
+            }
+          };
+
+          return {
+            sessions: { ...state.sessions, [currentId]: updatedSession }
+          };
+        });
+      },
+
+      damageEntity: (entityId, amount) => {
+        const currentId = get().currentSessionId;
+        if (!currentId) return;
+
+        set((state) => {
+          const session = state.sessions[currentId];
+          if (!session?.encounter) return state;
+
+          const updatedEntities = session.encounter.entities.map(e => {
+            if (e.id === entityId) {
+              const newHp = Math.max(0, e.hp - amount);
+              return { ...e, hp: newHp };
+            }
+            return e;
+          });
+
+          const updatedSession: GameSession = {
+            ...session,
+            encounter: {
+              ...session.encounter,
+              entities: updatedEntities
+            }
+          };
+
+          return {
+            sessions: { ...state.sessions, [currentId]: updatedSession }
+          };
+        });
+      },
+
+      endCombat: () => {
+        const currentId = get().currentSessionId;
+        if (!currentId) return;
+
+        set((state) => {
+          const session = state.sessions[currentId];
+          if (!session) return state;
+
+          const updatedSession: GameSession = {
+            ...session,
+            encounter: undefined
+          };
+
+          return {
+            sessions: { ...state.sessions, [currentId]: updatedSession }
+          };
+        });
+      }
     }),
     {
       name: 'dnd-ai-master-sessions-v2',

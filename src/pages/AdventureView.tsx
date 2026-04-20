@@ -16,6 +16,8 @@ import { SRD_FEATS } from '../data/srd/feats';
 import { SRD_SKILLS } from '../data/srd/skills';
 import { SRD_CONDITIONS } from '../data/srd/conditions';
 import { calculateSkillBonus, calculateSavingThrowBonus, calculatePassiveScore } from '../utils/statsUtils';
+import { extractItemsFromText, cleanItemTags, extractXpFromText, extractFeaturesFromText } from '../utils/itemUtils';
+import { rollAttack, rollDamage, getAttackBonus } from '../utils/combatUtils';
 
 // ─── AI Service (Now handled via .env) ───────────────────────────────────────
 
@@ -30,7 +32,10 @@ const XP_LEVELS = [0, 0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000
 export default function AdventureView() {
   const navigate = useNavigate();
   const { characters, activeCharacterId } = useRoster();
-  const { sessions, currentSessionId, isLoading, addMessage, setLoading } = useGameSession();
+  const { 
+    sessions, currentSessionId, isLoading, addMessage, setLoading,
+    startCombat, endCombat, nextTurn, damageEntity 
+  } = useGameSession();
 
   const currentSession = currentSessionId ? sessions[currentSessionId] : null;
   const messages = currentSession?.messages || [];
@@ -53,15 +58,21 @@ export default function AdventureView() {
   const [newItemsAlert, setNewItemsAlert] = useState<any[]>([]);
   const [slotSelection, setSlotSelection] = useState<string | null>(null);
   const [showRestModal, setShowRestModal] = useState(false);
+  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
+  const lastProcessedTurn = useRef<number | null>(null);
 
   const { 
     addItemToCharacter, removeItemFromCharacter, equipItem, 
     equipItemInSlot, unequipItem, addXp, addFeatureToCharacter, 
-    levelUp, longRest, shortRest, removeCondition: removeConditionByStore 
+    levelUp, longRest, shortRest, removeCondition: removeConditionByStore,
+    updateHp 
   } = useRoster();
 
   const character = characters.find(c => c.id === activeCharacterId);
   const activeModule = ADVENTURE_MODULES.find(m => m.id === activeModuleId);
+  const encounter = currentSession?.encounter;
+  const currentTurnEntity = encounter?.entities[encounter.turnIndex];
+  const isPlayerTurn = currentTurnEntity?.isPlayer === true;
 
   const charSpells = character
     ? [...STARTER_SPELLS.cantrips, ...STARTER_SPELLS.level_1].filter(s => character.spells?.includes(s.id))
@@ -94,7 +105,7 @@ export default function AdventureView() {
           text: m.text,
         }));
 
-      const systemPrompt = buildSystemPrompt(character, activeModule);
+      const systemPrompt = buildSystemPrompt(character, activeModule, encounter);
       const promptText = isOpening
         ? 'Comienza la aventura con una apertura épica.'
         : userText ?? '';
@@ -147,6 +158,15 @@ export default function AdventureView() {
       if (rollReq) {
         setPendingRoll(rollReq);
       }
+
+      // Check for [DAÑO: X] tags (Cap. 9)
+      const damageMatch = fullResponse.match(/\[DAÑO:\s*(\d+)\]/i);
+      if (damageMatch && character) {
+        const dmg = parseInt(damageMatch[1]);
+        updateHp(character.id, -dmg);
+        addMessage({ role: 'system', text: `💥 ¡Has recibido ${dmg} puntos de daño!` });
+      }
+
     } catch (err: any) {
       console.error('AI error:', err);
       const isConfigError = err.message?.includes('Configuración incompleta');
@@ -158,7 +178,53 @@ export default function AdventureView() {
     } finally {
       setLoading(false);
     }
-  }, [character, messages, addMessage, setLoading]);
+  }, [character, messages, activeModule, addMessage, setLoading, encounter, updateHp]);
+
+  // ─── Player Combat Actions (Cap. 9) ─────────────────────────────────────────
+  const handlePlayerAttack = (targetId: string, item: Item) => {
+    if (!character || !encounter) return;
+    
+    const attack = rollAttack(character, item);
+    const target = encounter.entities.find(e => e.id === targetId);
+    
+    if (!target) return;
+
+    let hitResult = `🎲 [ATAQUE: ${attack.total}] vs CA ${target.ac} -> `;
+    const isHit = attack.isCrit || (!attack.isFumble && attack.total >= target.ac);
+
+    if (isHit) {
+      const damage = rollDamage(character, item, attack.isCrit);
+      hitResult += `💥 ¡IMPACTO! (Daño: ${damage.total} ${damage.type})`;
+      damageEntity(targetId, damage.total);
+      
+      if (target.hp - damage.total <= 0) {
+        hitResult += ` 💀 ${target.name} ha caído.`;
+      }
+    } else {
+      hitResult += `❌ FALLO.`;
+    }
+
+    addMessage({ role: 'system', text: `Atacas a ${target.name} con ${item.name}. ${hitResult}` });
+  };
+
+  const handleStartMockCombat = () => {
+    if (!character) return;
+    const playerEntity = {
+      id: character.id,
+      name: character.name,
+      hp: character.hp,
+      maxHp: character.maxHp,
+      ac: character.ac,
+      initiative: 0,
+      isPlayer: true
+    };
+    const enemies = [
+      { name: 'Trasgo A', hp: 7, maxHp: 7, ac: 13, type: 'enemy' as const },
+      { name: 'Trasgo B', hp: 7, maxHp: 7, ac: 13, type: 'enemy' as const }
+    ];
+    startCombat(playerEntity, enemies);
+    addMessage({ role: 'system', text: '⚔️ Se ha iniciado el combate. ¡Orden de iniciativa establecido!' });
+  };
 
   const handleRoll = async () => {
     if (!pendingRoll || isRolling) return;
@@ -191,6 +257,24 @@ export default function AdventureView() {
 
     sendMessage(systemMsg);
   };
+
+  // ─── AI Combat Turn Trigger (Cap. 9) ───────────────────────────────────────
+  useEffect(() => {
+    if (!encounter?.isActive || isPlayerTurn || isLoading || !currentTurnEntity) return;
+    
+    // Prevent double-triggering for the same turn
+    if (lastProcessedTurn.current === encounter.turnIndex) return;
+
+    // It's an enemy's turn! Prompt the DM.
+    const triggerAiTurn = async () => {
+      lastProcessedTurn.current = encounter.turnIndex;
+      // Small delay for natural flow
+      await new Promise(r => setTimeout(r, 1200));
+      sendMessage(`[TURNO: ${currentTurnEntity.name}] DM: Realiza su acción de combate siguiendo las reglas.`);
+    };
+
+    triggerAiTurn();
+  }, [encounter?.isActive, encounter?.turnIndex, isPlayerTurn, isLoading, currentTurnEntity, sendMessage]);
 
   // ─── Start session on mount ───────────────────────────────────────────────
   useEffect(() => {
@@ -309,7 +393,64 @@ export default function AdventureView() {
       <main style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
         {activeTab === 'aventura' && (
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column', maxWidth: '900px', margin: '0 auto', width: '100%' }}>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 120px' }}>
+            
+            {/* COMBAT INITIATIVE BANNER (Cap. 9) */}
+            {encounter?.isActive && (
+              <div style={{ 
+                background: 'rgba(212,175,55,0.05)', borderBottom: '1px solid rgba(212,175,55,0.2)',
+                padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '15px', overflowX: 'auto',
+                backdropFilter: 'blur(10px)', zIndex: 10
+              }}>
+                <div style={{ fontSize: '10px', color: 'var(--accent-gold)', fontWeight: 'bold', whiteSpace: 'nowrap' }}>RONDA {encounter.round} | TURNO:</div>
+                {encounter.entities.map((e, i) => (
+                  <div key={e.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px',
+                    borderRadius: '20px', background: encounter.turnIndex === i ? 'var(--accent-gold)' : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${encounter.turnIndex === i ? 'white' : 'rgba(255,255,255,0.1)'}`,
+                    transition: 'all 0.3s ease'
+                  }}>
+                    <span style={{ fontSize: '10px', color: encounter.turnIndex === i ? 'black' : 'white', fontWeight: 'bold' }}>{e.initiative}</span>
+                    <span style={{ fontSize: '12px', color: encounter.turnIndex === i ? 'black' : 'white' }}>{e.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 120px', position: 'relative' }}>
+              
+              {/* ENEMIES LIST OVERLAY (Cap. 9) */}
+              {encounter?.isActive && (
+                <div style={{ position: 'sticky', top: '10px', right: '10px', zIndex: 5, pointerEvents: 'none' }}>
+                   <div style={{ float: 'right', width: '220px', pointerEvents: 'auto' }} className="glass-panel animate-fade-in">
+                      <div style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: '9px', color: '#fca5a5', fontWeight: 'bold' }}>ENEMIGOS ACTIVOS</div>
+                      <div style={{ maxHeight: '300px', overflowY: 'auto', padding: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {encounter.entities.filter(e => !e.isPlayer).map(e => (
+                          <div 
+                            key={e.id}
+                            onClick={() => setSelectedTargetId(e.id)}
+                            style={{
+                              padding: '8px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)',
+                              border: `1px solid ${selectedTargetId === e.id ? '#ef4444' : 'rgba(255,255,255,0.05)'}`,
+                              cursor: 'pointer', transition: 'all 0.2s'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '11px' }}>
+                              <span style={{ fontWeight: 'bold', color: e.hp <= 0 ? 'rgba(255,255,255,0.3)' : 'white' }}>{e.name}</span>
+                              <span style={{ opacity: 0.4 }}>CA {e.ac}</span>
+                            </div>
+                            <div style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                              <div style={{ 
+                                height: '100%', width: `${(e.hp / e.maxHp) * 100}%`,
+                                background: 'linear-gradient(90deg, #ef4444, #b91c1c)',
+                                transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
+                              }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                   </div>
+                </div>
+              )}
               {messages.length === 0 && !streamingText && (
                 <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--text-muted)' }}>
                   <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎭</div>
@@ -350,8 +491,39 @@ export default function AdventureView() {
               <div ref={chatEndRef} />
             </div>
 
-            {/* Input area */}
+            {/* Input area & Combat Actions */}
             <div style={{ padding: '20px', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.5)' }}>
+              
+              {/* COMBAT ACTIONS (Cap. 9) */}
+              {encounter?.isActive && (
+                <div className="animate-fade-in" style={{ maxWidth: '800px', margin: '0 auto 15px auto' }}>
+                  <div style={{ fontSize: '10px', color: isPlayerTurn ? 'var(--accent-gold)' : '#f87171', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase' }}>
+                    {isPlayerTurn ? '🔧 TUS ACCIONES' : `⏳ TURNO DE ${currentTurnEntity?.name?.toUpperCase()}`}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {isPlayerTurn && character?.inventory?.filter(i => (character.equipment as any)?.mainHand === i.id || (character.equipment as any)?.ranged === i.id).map(weapon => (
+                      <button
+                        key={weapon.id}
+                        disabled={!selectedTargetId || isLoading}
+                        onClick={() => handlePlayerAttack(selectedTargetId!, weapon)}
+                        className="glass-button"
+                        style={{ padding: '8px 12px', fontSize: '11px', borderColor: 'rgba(239, 68, 68, 0.4)', background: 'rgba(239, 68, 68, 0.05)', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        ⚔️ Atacar con {weapon.name} {selectedTargetId ? '' : '(Selecciona Objetivo)'}
+                      </button>
+                    ))}
+                    <button 
+                      onClick={() => nextTurn()} 
+                      disabled={isLoading}
+                      className="glass-button" 
+                      style={{ padding: '8px 12px', fontSize: '11px', background: 'rgba(255,255,255,0.05)', borderColor: isPlayerTurn ? 'var(--accent-gold)' : 'rgba(255,255,255,0.2)' }}
+                    >
+                      ⏩ {isPlayerTurn ? 'Finalizar Turno' : 'Siguiente Combate'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div style={{ position: 'relative', maxWidth: '800px', margin: '0 auto' }}>
                 <textarea
                   ref={inputRef}
@@ -447,6 +619,18 @@ export default function AdventureView() {
                     }}
                   >
                     <Flame size={16} /> Descansar
+                  </button>
+
+                  <button 
+                    onClick={handleStartMockCombat}
+                    className="glass-button"
+                    style={{ 
+                      padding: '10px 20px', borderRadius: '8px', fontSize: '14px', 
+                      background: 'rgba(239,68,68,0.1)', border: '1px solid #ef4444', 
+                      color: '#f87171', cursor: 'pointer' 
+                    }}
+                  >
+                    ⚔️ Iniciar Combate
                   </button>
 
                   {/* Level Up Button */}
@@ -562,6 +746,41 @@ export default function AdventureView() {
 
               {/* Passives and Features Column */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                
+                {/* ENEMIES LIST (Cap. 9) */}
+                {encounter?.isActive && (
+                  <div className="glass-panel" style={{ padding: '20px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                    <p style={{ fontSize: '10px', color: '#fca5a5', letterSpacing: '1px', marginBottom: '15px', fontWeight: 'bold' }}>ENEMIGOS EN EL ÁREA</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                      {encounter.entities.filter(e => !e.isPlayer).map(e => (
+                        <div 
+                          key={e.id}
+                          onClick={() => setSelectedTargetId(e.id)}
+                          style={{
+                            padding: '12px', borderRadius: '8px', background: 'rgba(0,0,0,0.3)',
+                            border: `1px solid ${selectedTargetId === e.id ? '#ef4444' : 'rgba(255,255,255,0.05)'}`,
+                            cursor: 'pointer', transition: 'all 0.2s'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 'bold', color: e.hp <= 0 ? 'rgba(255,255,255,0.3)' : 'white' }}>{e.name}</span>
+                            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>CA {e.ac}</span>
+                          </div>
+                          {/* Animated HP Bar */}
+                          <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div style={{ 
+                              height: '100%', width: `${(e.hp / e.maxHp) * 100}%`,
+                              background: 'linear-gradient(90deg, #ef4444, #b91c1c)',
+                              transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                            }} />
+                          </div>
+                          <div style={{ textAlign: 'right', fontSize: '10px', color: '#fca5a5', marginTop: '4px' }}>{e.hp} / {e.maxHp} HP</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <p style={{ fontSize: '10px', color: 'var(--accent-gold)', letterSpacing: '1px', marginBottom: '15px', fontWeight: 'bold' }}>PASIVAS Y RASGOS</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

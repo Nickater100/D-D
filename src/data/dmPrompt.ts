@@ -1,4 +1,4 @@
-import type { Character } from '../types/dnd';
+import type { Character, CombatEncounter } from '../types/dnd';
 import type { AdventureModule } from './adventures';
 import { SRD_SKILLS } from './srd/skills';
 import { SRD_CONDITIONS } from './srd/conditions';
@@ -15,7 +15,7 @@ const STAT_NAMES: Record<string, string> = {
   int: 'Inteligencia', wis: 'Sabiduría', cha: 'Carisma'
 };
 
-export function buildSystemPrompt(character: Character, module?: AdventureModule | null): string {
+export function buildSystemPrompt(character: Character, module?: AdventureModule | null, encounter?: CombatEncounter): string {
   const attrs = Object.entries(character.attributes)
     .map(([k, v]) => `${STAT_NAMES[k]} ${v} (${mod(v as number)})`)
     .join(', ');
@@ -77,9 +77,20 @@ CONTEXTO DE LA AVENTURA: ${module.title}
 ${module.systemContext || 'Inicia una aventura épica.'}
 ` : '';
 
+  const encounterContext = encounter?.isActive ? `
+═══ ESTADO DE COMBATE (RONDA ${encounter.round}) ═══
+ORDEN DE INICIATIVA: ${encounter.entities.map(e => `${e.name} (${e.initiative}${e.isPlayer ? ', Tú' : ''})`).join(' > ')}
+TURNO ACTUAL: ${encounter.entities[encounter.turnIndex]?.name} ${encounter.entities[encounter.turnIndex]?.isPlayer ? '(MOMENTO DEL JUGADOR)' : '(TURNO DEL DM)'}
+
+ENEMIGOS ACTIVOS:
+${encounter.entities.filter(e => !e.isPlayer).map(e => `- ${e.name}: ${e.hp}/${e.maxHp} HP | CA ${e.ac}`).join('\n')}
+══════════════════════════════════
+` : '';
+
   return `Eres un Dungeon Master magistral para una partida de D&D 5a Edición (2024) en español. 
 Eres épico, descriptivo, justo y dramático. Narras con tensión y evocas atmósferas vívidas.
 ${moduleContext}
+${encounterContext}
 ══════════════════════════════════
 FICHA DEL HÉROE
 ══════════════════════════════════
@@ -139,6 +150,13 @@ REGLAS DE CONDUCTA PARA EL DM:
 9. Nunca salgas del personaje.
 10. El tono es épico y oscuro.
 11. Cuando pidas una [TIRADA:], DETENTE.
+
+### PROTOCOLO DE COMBATE (Cap. 9):
+1. El sistema gestiona la INICIATIVA y la VIDA de los enemigos. Tú debes narrar los resultados.
+2. Si el sistema indica que es el turno de un enemigo (TURNO DEL DM), narra su acción buscando impactar la CA del jugador (${character.ac}). 
+3. El jugador atacará usando botones. Si acierta, el sistema informará del daño. Tú debes describir narrativamente el efecto del golpe basándote en la vida restante del enemigo.
+4. Si un enemigo muere (0 HP), narra su derrota de forma satisfactoria.
+5. Usa el tag [DAÑO: X] solo si el jugador recibe daño de un enemigo, para que el sistema reste su vida.
 
 INICIO: ${module?.startingMessage ? 'MUY IMPORTANTE: La aventura YA HA COMENZADO con un texto preescrito que el jugador acaba de leer. NO generes una nueva apertura. Tu primera respuesta debe ser una continuación directa de la escena descrita, reaccionando a la primera acción del jugador de forma coherente con el entorno ya establecido.' : 'Cuando el jugador comience, selecciona un escenario inicial apropiado para su clase y trasfondo. Descríbelo en una apertura corta y dramática de 3-4 oraciones. Luego pregunta qué hace.'}`;
 }
