@@ -18,6 +18,9 @@ import { SRD_CONDITIONS } from '../data/srd/conditions';
 import { calculateSkillBonus, calculateSavingThrowBonus, calculatePassiveScore } from '../utils/statsUtils';
 import { extractItemsFromText, cleanItemTags, extractXpFromText, extractFeaturesFromText } from '../utils/itemUtils';
 import { rollAttack, rollDamage, getAttackBonus } from '../utils/combatUtils';
+import { SPELLS_LEVEL_0, SPELLS_LEVEL_1, SPELLS_LEVEL_2 } from '../data/srd/spells';
+
+const ALL_SRD_SPELLS = [...SPELLS_LEVEL_0, ...SPELLS_LEVEL_1, ...SPELLS_LEVEL_2];
 
 // ─── AI Service (Now handled via .env) ───────────────────────────────────────
 
@@ -36,6 +39,7 @@ export default function AdventureView() {
     sessions, currentSessionId, isLoading, addMessage, setLoading,
     startCombat, endCombat, nextTurn, damageEntity, deleteSession 
   } = useGameSession();
+
 
   const currentSession = currentSessionId ? sessions[currentSessionId] : null;
   const messages = currentSession?.messages || [];
@@ -65,7 +69,8 @@ export default function AdventureView() {
     addItemToCharacter, removeItemFromCharacter, equipItem, 
     equipItemInSlot, unequipItem, addXp, addFeatureToCharacter, 
     levelUp, longRest, shortRest, removeCondition: removeConditionByStore,
-    updateHp, addDeathSaveSuccess, addDeathSaveFailure, resetDeathSaves 
+    updateHp, addDeathSaveSuccess, addDeathSaveFailure, resetDeathSaves,
+    useSpellSlot, prepareSpell, unprepareSpell, setConcentration
   } = useRoster();
 
   const character = characters.find(c => c.id === activeCharacterId);
@@ -75,7 +80,7 @@ export default function AdventureView() {
   const isPlayerTurn = currentTurnEntity?.isPlayer === true;
 
   const charSpells = character
-    ? [...STARTER_SPELLS.cantrips, ...STARTER_SPELLS.level_1].filter(s => character.spells?.includes(s.id))
+    ? ALL_SRD_SPELLS.filter(s => character.spells?.includes(s.id))
     : [];
 
   // Auto-scroll to latest message
@@ -163,6 +168,22 @@ export default function AdventureView() {
       const damageMatch = fullResponse.match(/\[DAÑO:\s*(\d+)\]/i);
       if (damageMatch && character) {
         const dmg = parseInt(damageMatch[1]);
+        
+        // Concentration Check (Cap. 10)
+        if (character.concentration && dmg > 0) {
+          const conMod = Math.floor(((character.attributes.con || 10) - 10) / 2);
+          const saveRoll = Math.floor(Math.random() * 20) + 1;
+          const total = saveRoll + conMod + (character.proficiencyBonus); // Using proficiency for saves
+          const dc = Math.max(10, Math.floor(dmg / 2));
+          
+          if (total < dc) {
+            setConcentration(character.id, null);
+            addMessage({ role: 'system', text: `💔 ¡Has perdido la concentración! (${total} vs CD ${dc})` });
+          } else {
+            addMessage({ role: 'system', text: `🛡️ Mantienes la concentración (${total} vs CD ${dc})` });
+          }
+        }
+
         updateHp(character.id, -dmg);
         addMessage({ role: 'system', text: `💥 ¡Has recibido ${dmg} puntos de daño!` });
       }
@@ -205,6 +226,35 @@ export default function AdventureView() {
     }
 
     addMessage({ role: 'system', text: `Atacas a ${target.name} con ${item.name}. ${hitResult}` });
+  };
+
+  const handlePlayerSpellCast = (targetId: string, spellId: string) => {
+    if (!character || !encounter) return;
+    const spell = ALL_SRD_SPELLS.find(s => s.id === spellId);
+    if (!spell) return;
+
+    // Check slots
+    if (spell.level > 0) {
+      const isWarlock = character.classes.some(c => c.classId === 'warlock');
+      const hasShared = (character.currentSpellSlots?.[spell.level] || 0) > 0;
+      const hasWarlock = isWarlock && (character.currentWarlockSlots || 0) > 0 && spell.level <= (character.warlockSlots?.level || 0);
+      
+      if (!hasShared && !hasWarlock) {
+        addMessage({ role: 'system', text: `❌ No te quedan espacios de conjuro de nivel ${spell.level}.` });
+        return;
+      }
+      useSpellSlot(character.id, spell.level);
+    }
+
+    if (spell.concentration) {
+      setConcentration(character.id, spell.id);
+    }
+
+    const target = encounter.entities.find(e => e.id === targetId);
+    addMessage({ role: 'system', text: `✨ Lanzas ${spell.name}${target ? ` sobre ${target.name}` : ''}. ${spell.concentration ? '(Requiere Concentración)' : ''}` });
+    
+    // Notify AI
+    sendMessage(`[SISTEMA: El jugador ha lanzado el conjuro "${spell.name}" (Nivel ${spell.level})${target ? ` contra ${target.name}` : ''}. Aplica los efectos correspondientes.]`);
   };
 
   const handleStartMockCombat = () => {
@@ -584,6 +634,37 @@ export default function AdventureView() {
                       </button>
                     ))}
 
+                    {/* SPELLS ACTIONS (Cap. 10) */}
+                    {isPlayerTurn && character && character.hp > 0 && ALL_SRD_SPELLS.filter(s => {
+                      const isKnown = character.spells?.includes(s.id);
+                      if (!isKnown) return false;
+                      
+                      // Filter by preparation for preparing classes
+                      const needsPrep = character.classes.some(c => ['cleric', 'druid', 'wizard', 'paladin'].includes(c.classId));
+                      if (needsPrep && s.level > 0 && !character.preparedSpells?.includes(s.id)) return false;
+                      
+                      return true;
+                    }).map(spell => {
+                      const canCast = spell.level === 0 || (character.currentSpellSlots?.[spell.level] || 0) > 0 || (character.currentWarlockSlots || 0) > 0;
+                      return (
+                        <button
+                          key={spell.id}
+                          disabled={isLoading || !canCast}
+                          onClick={() => handlePlayerSpellCast(selectedTargetId || 'narrative', spell.id)}
+                          className="glass-button"
+                          style={{ 
+                            padding: '8px 12px', fontSize: '11px', 
+                            borderColor: spell.level === 0 ? 'rgba(56, 189, 248, 0.4)' : 'rgba(168, 85, 247, 0.4)', 
+                            background: spell.level === 0 ? 'rgba(56, 189, 248, 0.05)' : 'rgba(168, 85, 247, 0.05)',
+                            display: 'flex', alignItems: 'center', gap: '6px',
+                            opacity: canCast ? 1 : 0.5
+                          }}
+                        >
+                          ✨ {spell.name} {spell.level > 0 ? `(Nvl ${spell.level})` : '(Truco)'}
+                        </button>
+                      );
+                    })}
+
                     {/* Death Save Button */}
                     {isPlayerTurn && character && character.hp === 0 && (character.deathSaves?.failure || 0) < 3 && (character.deathSaves?.success || 0) < 3 && (
                       <button
@@ -616,6 +697,67 @@ export default function AdventureView() {
                       ⏩ {isPlayerTurn ? 'Finalizar Turno' : 'Siguiente Combate'}
                     </button>
                   </div>
+
+                  {/* Spell Slots Tracker (Cap. 10) */}
+                  {character && character.spellSlots && Object.keys(character.spellSlots).length > 0 && (
+                    <div style={{ display: 'flex', gap: '15px', padding: '10px', background: 'rgba(168, 85, 247, 0.05)', borderRadius: '8px', marginTop: '10px', border: '1px solid rgba(168, 85, 247, 0.1)' }}>
+                      <div style={{ fontSize: '10px', color: '#c084fc', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                         <Zap size={10} /> ESPACIOS:
+                      </div>
+                      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                        {Object.entries(character.spellSlots).map(([lvl, max]) => (
+                          <div key={lvl} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)' }}>Niv {lvl}:</span>
+                            <div style={{ display: 'flex', gap: '3px' }}>
+                              {Array.from({ length: Number(max) }).map((_, i) => (
+                                <div 
+                                  key={i} 
+                                  style={{ 
+                                    width: '8px', height: '8px', borderRadius: '2px', 
+                                    background: (character.currentSpellSlots?.[Number(lvl)] || 0) > i ? '#c084fc' : 'rgba(255,255,255,0.1)',
+                                    boxShadow: (character.currentSpellSlots?.[Number(lvl)] || 0) > i ? '0 0 5px #c084fc' : 'none'
+                                  }} 
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        {character.warlockSlots && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', borderLeft: '1px solid rgba(255,255,255,0.1)', paddingLeft: '10px' }}>
+                            <span style={{ fontSize: '9px', color: '#fb923c' }}>Pacto (Niv {character.warlockSlots.level}):</span>
+                            <div style={{ display: 'flex', gap: '3px' }}>
+                              {Array.from({ length: character.warlockSlots.count }).map((_, i) => (
+                                <div 
+                                  key={i} 
+                                  style={{ 
+                                    width: '8px', height: '8px', borderRadius: '50%', 
+                                    background: (character.currentWarlockSlots || 0) > i ? '#fb923c' : 'rgba(255,255,255,0.1)',
+                                    boxShadow: (character.currentWarlockSlots || 0) > i ? '0 0 5px #fb923c' : 'none'
+                                  }} 
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Concentration Indicator (Cap. 10) */}
+                  {character?.concentration && (
+                    <div className="animate-pulse" style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: 'rgba(56, 189, 248, 0.1)', borderRadius: '6px', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+                      <Eye size={12} color="#38bdf8" />
+                      <span style={{ fontSize: '10px', color: '#7dd3fc', fontWeight: 'bold' }}>
+                        CONCENTRACIÓN: {ALL_SRD_SPELLS.find(s => s.id === character.concentration?.spellId)?.name || 'Hechizo'}
+                      </span>
+                      <button 
+                        onClick={() => setConcentration(character.id, null)}
+                        style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#38bdf8', fontSize: '12px', cursor: 'pointer', padding: '0 4px' }}
+                      >
+                        × Cancelar
+                      </button>
+                    </div>
+                  )}
 
                   {/* Death Saves Counters */}
                   {character && character.hp === 0 && (
@@ -972,18 +1114,22 @@ export default function AdventureView() {
             {/* ESPACIOS DE CONJURO (Cap. 6) */}
             {(character?.spellSlots || character?.warlockSlots) && (
               <div>
-                <p style={{ fontSize: '10px', color: 'var(--accent-gold)', letterSpacing: '1px', marginBottom: '15px', fontWeight: 'bold' }}>ESPACIOS DE CONJURO</p>
+                <p style={{ fontSize: '10px', color: 'var(--accent-gold)', letterSpacing: '1px', marginBottom: '15px', fontWeight: 'bold' }}>ESPACIOS DE CONJURO DISPONIBLES</p>
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  {character.spellSlots && Object.entries(character.spellSlots).map(([lvl, count]) => (
-                    <div key={`slot-${lvl}`} className="glass-panel" style={{ padding: '10px 20px', textAlign: 'center', border: '1px solid rgba(167,139,250,0.3)' }}>
+                  {character.spellSlots && Object.entries(character.spellSlots).map(([lvl, max]) => (
+                    <div key={`slot-${lvl}`} className="glass-panel" style={{ padding: '10px 20px', textAlign: 'center', border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.05)' }}>
                       <div style={{ fontSize: '8px', color: '#a78bfa' }}>NIVEL {lvl}</div>
-                      <div style={{ fontSize: '18px' }}>{count}</div>
+                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'white' }}>
+                        {character.currentSpellSlots?.[Number(lvl)] || 0} / {max}
+                      </div>
                     </div>
                   ))}
                   {character.warlockSlots && (
-                    <div className="glass-panel" style={{ padding: '10px 20px', textAlign: 'center', border: '1px solid rgba(236, 72, 153, 0.4)', background: 'rgba(236, 72, 153, 0.05)' }}>
-                      <div style={{ fontSize: '8px', color: '#f472b6' }}>PACTO (Lvl {character.warlockSlots.level})</div>
-                      <div style={{ fontSize: '18px' }}>{character.warlockSlots.count}</div>
+                    <div className="glass-panel" style={{ padding: '10px 20px', textAlign: 'center', border: '1px solid rgba(251,146,60,0.4)', background: 'rgba(251,146,60,0.05)' }}>
+                      <div style={{ fontSize: '8px', color: '#fb923c' }}>PACTO (Lvl {character.warlockSlots.level})</div>
+                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'white' }}>
+                        {character.currentWarlockSlots || 0} / {character.warlockSlots.count}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1003,9 +1149,33 @@ export default function AdventureView() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
                         <div>
                           <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'white' }}>{s.name}</div>
-                          <div style={{ fontSize: '9px', color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '1px' }}>{s.type}</div>
+                          <div style={{ fontSize: '9px', color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                            {s.level === 0 ? 'Truco' : `Nivel ${s.level}`} — {s.school}
+                          </div>
                         </div>
-                        <div style={{ fontSize: '18px' }}>✨</div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          {s.level > 0 && character.classes.some(c => ['cleric', 'druid', 'wizard', 'paladin'].includes(c.classId)) && (
+                            <button
+                              onClick={() => {
+                                if (character.preparedSpells?.includes(s.id)) {
+                                  unprepareSpell(character.id, s.id);
+                                } else {
+                                  prepareSpell(character.id, s.id);
+                                }
+                              }}
+                              className="glass-button"
+                              style={{ 
+                                padding: '4px 8px', fontSize: '10px', 
+                                background: character.preparedSpells?.includes(s.id) ? 'rgba(34, 197, 94, 0.1)' : 'rgba(255,255,255,0.05)',
+                                borderColor: character.preparedSpells?.includes(s.id) ? '#4ade80' : 'rgba(255,255,255,0.2)',
+                                color: character.preparedSpells?.includes(s.id) ? '#4ade80' : 'rgba(255,255,255,0.4)'
+                              }}
+                            >
+                              {character.preparedSpells?.includes(s.id) ? 'PREPARADO' : 'PREPARAR'}
+                            </button>
+                          )}
+                          <div style={{ fontSize: '18px' }}>✨</div>
+                        </div>
                       </div>
                       <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5', margin: 0 }}>{s.desc}</p>
                     </div>

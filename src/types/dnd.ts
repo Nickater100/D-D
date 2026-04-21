@@ -97,9 +97,13 @@ export interface Character {
 
   // Features, Spells & Feats
   feats?: string[]; // list of feat IDs
-  spells?: string[]; // list of spell IDs
-  spellSlots?: Record<number, number>; // Shared slots
-  warlockSlots?: { count: number, level: number }; // Pact Magic
+  spells?: string[]; // list of spell IDs (all known/learned)
+  preparedSpells?: string[]; // list of currently prepared spell IDs
+  spellSlots?: Record<number, number>; // Max slots
+  currentSpellSlots?: Record<number, number>; // Available today
+  warlockSlots?: { count: number, level: number }; // Max Pact Magic
+  currentWarlockSlots?: number; // Available Pact Magic
+  concentration?: { spellId: string; dc: number } | null;
   features?: Feature[]; // Used for both class features and narrative consequences
   
   inventory?: Item[];

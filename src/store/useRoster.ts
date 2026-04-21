@@ -29,6 +29,12 @@ interface RosterState {
   addDeathSaveSuccess: (charId: string) => void;
   addDeathSaveFailure: (charId: string, amount: number) => void;
   resetDeathSaves: (charId: string) => void;
+  
+  // Magic Actions (Cap. 10)
+  useSpellSlot: (charId: string, level: number) => void;
+  prepareSpell: (charId: string, spellId: string) => void;
+  unprepareSpell: (charId: string, spellId: string) => void;
+  setConcentration: (charId: string, spellId: string | null) => void;
 }
 
 export const useRoster = create<RosterState>()(
@@ -196,7 +202,9 @@ export const useRoster = create<RosterState>()(
             maxHp: c.maxHp + hpGain,
             hp: c.maxHp + hpGain,
             spellSlots: shared,
-            warlockSlots: warlock
+            currentSpellSlots: shared,
+            warlockSlots: warlock,
+            currentWarlockSlots: warlock?.count || 0
           };
           return updatedChar;
         }),
@@ -227,7 +235,9 @@ export const useRoster = create<RosterState>()(
             maxHp: c.maxHp + hpGain,
             hp: c.maxHp + hpGain,
             spellSlots: shared,
-            warlockSlots: warlock
+            currentSpellSlots: shared,
+            warlockSlots: warlock,
+            currentWarlockSlots: warlock?.count || 0
           };
           return updatedChar;
         })
@@ -245,7 +255,11 @@ export const useRoster = create<RosterState>()(
           // 2. Recover Spell Slots
           const { shared, warlock } = getMulticlassSpellSlots(c.classes);
           updatedChar.spellSlots = shared;
+          updatedChar.currentSpellSlots = shared;
           updatedChar.warlockSlots = warlock;
+          updatedChar.currentWarlockSlots = warlock?.count || 0;
+          
+          updatedChar.concentration = null;
           
           // 3. Recover Exhaustion (1 level per long rest)
           updatedChar.exhaustion = Math.max(0, (c.exhaustion || 0) - 1);
@@ -277,7 +291,9 @@ export const useRoster = create<RosterState>()(
           return {
             ...c,
             hp: Math.min(c.maxHp, c.hp + healAmount),
-            hitDice: newHitDice
+            hitDice: newHitDice,
+            // Warlocks recover slots on short rest
+            currentWarlockSlots: c.warlockSlots?.count || 0
           };
         })
       })),
@@ -314,6 +330,15 @@ export const useRoster = create<RosterState>()(
           const newHp = Math.max(0, Math.min(c.maxHp, (c.hp || 0) + amount));
           // Reset death saves if healing from 0
           const shouldReset = c.hp === 0 && newHp > 0;
+          
+          // Concentration Check if damage
+          let concentration = c.concentration;
+          if (amount < 0 && concentration) {
+            // Logic for auto-break or manual check will be in UI, 
+            // but here we can at least flag it or let UI handle the visual trigger.
+            // For now, we keep it as is, AdventureView will trigger the check.
+          }
+
           return { 
             ...c, 
             hp: newHp,
@@ -344,6 +369,61 @@ export const useRoster = create<RosterState>()(
       set((state) => ({
         characters: state.characters.map((c) =>
           c.id === charId ? { ...c, deathSaves: { success: 0, failure: 0 } } : c
+        ),
+      })),
+
+    useSpellSlot: (charId, level) =>
+      set((state) => ({
+        characters: state.characters.map((c) => {
+          if (c.id !== charId) return c;
+          if (level === 0) return c; // Cantrips
+          
+          if (c.warlockSlots && level === c.warlockSlots.level) {
+            return { ...c, currentWarlockSlots: Math.max(0, (c.currentWarlockSlots || 0) - 1) };
+          }
+          
+          const slots = { ...(c.currentSpellSlots || {}) };
+          if (!slots[level]) return c;
+          slots[level] = Math.max(0, slots[level] - 1);
+          return { ...c, currentSpellSlots: slots };
+        }),
+      })),
+
+    prepareSpell: (charId, spellId) =>
+      set((state) => ({
+        characters: state.characters.map((c) => {
+          if (c.id !== charId) return c;
+          
+          // Limit Check (Official Rule: Level + Ability Mod)
+          const casterClass = c.classes.find(cl => ['cleric', 'druid', 'wizard', 'paladin'].includes(cl.classId));
+          if (!casterClass) return { ...c, preparedSpells: [...(c.preparedSpells || []), spellId] };
+          
+          const primaryAttr = casterClass.classId === 'wizard' ? c.attributes.int : 
+                             casterClass.classId === 'paladin' ? c.attributes.cha : c.attributes.wis;
+          const mod = Math.floor((primaryAttr - 10) / 2);
+          const limit = Math.max(1, (casterClass.classId === 'paladin' ? Math.floor(casterClass.level / 2) : casterClass.level) + mod);
+          
+          const current = c.preparedSpells || [];
+          if (current.length >= limit) return c; // Limit reached
+          
+          if (current.includes(spellId)) return c;
+          return { ...c, preparedSpells: [...current, spellId] };
+        }),
+      })),
+
+    unprepareSpell: (charId, spellId) =>
+      set((state) => ({
+        characters: state.characters.map((c) =>
+          c.id === charId 
+            ? { ...c, preparedSpells: (c.preparedSpells || []).filter(id => id !== spellId) } 
+            : c
+        ),
+      })),
+
+    setConcentration: (charId, spellId) =>
+      set((state) => ({
+        characters: state.characters.map((c) =>
+          c.id === charId ? { ...c, concentration: spellId ? { spellId, dc: 10 } : null } : c
         ),
       })),
     }),

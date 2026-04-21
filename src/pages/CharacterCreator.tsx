@@ -14,6 +14,7 @@ import { SRD_EQUIPMENT } from '../data/srd/equipment';
 import { SRD_FEATS } from '../data/srd/feats';
 import { ErrorBoundary } from '../components/CharacterCreatorComponents';
 import { calculateModifier, calculateAC } from '../utils/statsUtils';
+import { getMulticlassSpellSlots } from '../utils/multiclassUtils';
 
 
 const ABILITY_MAP = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
@@ -285,7 +286,15 @@ export default function CharacterCreator() {
       conditions: [],
       hitDice: [
         { type: selectedClass.hitDie, current: 1, max: 1 }
-      ]
+      ],
+
+      // Magic (Cap. 10)
+      spellSlots: getMulticlassSpellSlots(tempChar.classes).shared,
+      currentSpellSlots: getMulticlassSpellSlots(tempChar.classes).shared,
+      warlockSlots: getMulticlassSpellSlots(tempChar.classes).warlock,
+      currentWarlockSlots: getMulticlassSpellSlots(tempChar.classes).warlock?.count || 0,
+      preparedSpells: [...selectedLvl1], // Initially prepare selected spells
+      concentration: null
     };
 
     addCharacter(newChar);
