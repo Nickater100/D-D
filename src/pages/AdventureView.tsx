@@ -2,25 +2,22 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send, Sword, Wand2, Zap, Scroll } from 'lucide-react';
 import { useRoster } from '../store/useRoster';
+import type { Item } from '../types/dnd';
 import { useGameSession } from '../store/useGameSession';
 import { buildSystemPrompt } from '../data/dmPrompt';
-import { STARTER_SPELLS } from '../data/spells_es';
 import { ADVENTURE_MODULES } from '../data/adventures';
-import type { AdventureModule } from '../data/adventures';
 import { getAIProvider } from '../services/ai';
 import type { ChatMessage } from '../services/ai';
 import { extractRollRequest, rollDice } from '../utils/diceUtils';
 import type { RollResult, RollRequest } from '../utils/diceUtils';
-import { ShoppingBag, Sword as SwordIcon, Package, Trash, Shield, ShieldQuestion, Gem, CircleDot, Footprints, Hand, Shirt, HardHat, Waypoints, Eye, ShieldAlert, Search, Flame, Moon, Activity, AlertTriangle } from 'lucide-react';
+import { ShoppingBag, Sword as SwordIcon, Package, Trash, Shield, ShieldQuestion, Gem, CircleDot, Footprints, Hand, Shirt, HardHat, Waypoints, Eye, Search, Flame, Moon, Activity, AlertTriangle } from 'lucide-react';
 import { SRD_FEATS } from '../data/srd/feats';
 import { SRD_SKILLS } from '../data/srd/skills';
 import { SRD_CONDITIONS } from '../data/srd/conditions';
 import { calculateSkillBonus, calculateSavingThrowBonus, calculatePassiveScore } from '../utils/statsUtils';
 import { extractItemsFromText, cleanItemTags, extractXpFromText, extractFeaturesFromText } from '../utils/itemUtils';
-import { rollAttack, rollDamage, getAttackBonus } from '../utils/combatUtils';
-import { SPELLS_LEVEL_0, SPELLS_LEVEL_1, SPELLS_LEVEL_2 } from '../data/srd/spells';
-
-const ALL_SRD_SPELLS = [...SPELLS_LEVEL_0, ...SPELLS_LEVEL_1, ...SPELLS_LEVEL_2];
+import { rollAttack, rollDamage } from '../utils/combatUtils';
+import { ALL_SRD_SPELLS } from '../data/srd/spells';
 
 // ─── AI Service (Now handled via .env) ───────────────────────────────────────
 
@@ -69,7 +66,7 @@ export default function AdventureView() {
     addItemToCharacter, removeItemFromCharacter, equipItem, 
     equipItemInSlot, unequipItem, addXp, addFeatureToCharacter, 
     levelUp, longRest, shortRest, removeCondition: removeConditionByStore,
-    updateHp, addDeathSaveSuccess, addDeathSaveFailure, resetDeathSaves,
+    updateHp, addDeathSaveSuccess, addDeathSaveFailure,
     useSpellSlot, prepareSpell, unprepareSpell, setConcentration
   } = useRoster();
 
@@ -314,7 +311,6 @@ export default function AdventureView() {
     
     setIsRolling(true);
     // Use the dice rolling system for visual feedback
-    const roll = { formula: '1d20', dc: 10 }; 
     await new Promise(r => setTimeout(r, 1000));
     const result = { 
       total: Math.floor(Math.random() * 20) + 1,
@@ -835,7 +831,7 @@ export default function AdventureView() {
                   </div>
 
                   {/* Conditions & Exhaustion Display (Cap. 8) */}
-                  <div style={{ display: 'flex', gap: '8px', mt: '12px', flexWrap: 'wrap', marginTop: '10px' }}>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
                     {character?.exhaustion && character.exhaustion > 0 ? (
                       <div style={{ 
                         display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px', 
@@ -1177,7 +1173,7 @@ export default function AdventureView() {
                           <div style={{ fontSize: '18px' }}>✨</div>
                         </div>
                       </div>
-                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5', margin: 0 }}>{s.desc}</p>
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5', margin: 0 }}>{s.description}</p>
                     </div>
                   ))}
                 </div>

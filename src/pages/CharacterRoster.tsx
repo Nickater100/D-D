@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRoster } from '../store/useRoster';
 import { Shield, Plus, ArrowLeft, Trash2, User, Wand2, Zap, Activity } from 'lucide-react';
-import { STARTER_SPELLS, } from '../data/spells_es';
+import { ALL_SRD_SPELLS } from '../data/srd/spells';
 import { SRD_RACES } from '../data/srd_es';
 
 export default function CharacterRoster() {
@@ -36,7 +36,7 @@ export default function CharacterRoster() {
         <div className="flex-col gap-4" style={{ flex: 1, overflowY: 'auto' }}>
           {characters.map(char => {
             const isActive = char.id === activeCharacterId;
-            const spells = [...STARTER_SPELLS.cantrips, ...STARTER_SPELLS.level_1].filter(s => char.spells?.includes(s.id));
+            const spells = ALL_SRD_SPELLS.filter(s => char.spells?.includes(s.id));
 
             return (
               <div 
@@ -192,7 +192,7 @@ export default function CharacterRoster() {
                                 <span className="text-blue-400 font-display uppercase text-xs">{s.name}</span>
                                 <span className="text-[9px] text-muted italic">{s.type}</span>
                               </div>
-                              <p className="text-[11px] text-secondary line-clamp-2 leading-relaxed">{s.desc}</p>
+                              <p className="text-[11px] text-secondary line-clamp-2 leading-relaxed">{s.description}</p>
                             </div>
                           )) : (
                             <div className="h-32 flex-col items-center justify-center text-muted opacity-30 italic text-sm">No posee artes místicas.</div>

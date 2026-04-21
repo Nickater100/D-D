@@ -35,6 +35,7 @@ interface RosterState {
   prepareSpell: (charId: string, spellId: string) => void;
   unprepareSpell: (charId: string, spellId: string) => void;
   setConcentration: (charId: string, spellId: string | null) => void;
+  levelUp: (charId: string) => void;
 }
 
 export const useRoster = create<RosterState>()(
@@ -179,7 +180,7 @@ export const useRoster = create<RosterState>()(
           c.id === charId ? { ...c, features: [...(c.features || []), feature] } : c
         ),
       })),
-    levelUp: (charId) =>
+    levelUp: (charId: string) =>
       set((state) => ({
         characters: state.characters.map((c) => {
           if (c.id !== charId) return c;

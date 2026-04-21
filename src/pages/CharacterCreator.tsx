@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, Shield, Minus, Plus, Wand2, Star, Flame, Heart, Sun, Eye, Sparkles, Skull, BookOpen, Medal } from 'lucide-react';
 import { useRoster } from '../store/useRoster';
 import type { Character, AbilityScores } from '../types/dnd';
-import { STARTER_SPELLS, GET_CLASS_MAGIC_CAPACITY } from '../data/spells_es';
-import { getStarterSpellsForClass } from '../data/srd/spells';
+import { ALL_SRD_SPELLS, getStarterSpellsForClass, getMagicCapacity } from '../data/srd/spells';
 import { SRD_BACKGROUNDS } from '../data/srd/backgrounds';
 import { SRD_RACES } from '../data/srd/races';
 import { SRD_CLASSES } from '../data/srd/classes';
@@ -95,7 +94,7 @@ export default function CharacterCreator() {
     setPointsRemaining(prev => prev + cost);
   };
 
-  const hasMagic = () => GET_CLASS_MAGIC_CAPACITY(selectedClass?.id) !== null;
+  const hasMagic = () => getMagicCapacity(selectedClass?.id) !== null;
 
   const handleNext = () => {
     setStep(prev => {
@@ -112,7 +111,7 @@ export default function CharacterCreator() {
   };
 
   const toggleSpell = (id: string, type: 'cantrip' | 'lvl1') => {
-    const caps = GET_CLASS_MAGIC_CAPACITY(selectedClass?.id);
+    const caps = getMagicCapacity(selectedClass?.id);
     if (!caps) return;
 
     if (type === 'cantrip') {
@@ -335,7 +334,7 @@ export default function CharacterCreator() {
       if (!selectedBackground || !selectedAlignment) return true;
     }
     if (step === 4) {
-      const caps = GET_CLASS_MAGIC_CAPACITY(selectedClass?.id);
+      const caps = getMagicCapacity(selectedClass?.id);
       if (caps && (selectedCantrips.length < caps.cantrips || selectedLvl1.length < caps.spells)) return true;
     }
     return false;
@@ -349,7 +348,7 @@ export default function CharacterCreator() {
       case "Control": return <Eye size={20} className="text-purple-500" />;
       case "Utilidad": return <Sparkles size={20} className="text-blue-300" />;
       case "Defensa": return <Shield size={20} className="text-blue-500" />;
-      case "Daño Sotenido": return <Skull size={20} className="text-green-500" />;
+      case "Daño Sostenido": return <Skull size={20} className="text-green-500" />;
       default: return <Wand2 size={20} className="text-gray-400" />;
     }
   };
@@ -763,15 +762,15 @@ export default function CharacterCreator() {
             <div className="w-full flex-col gap-4" style={{ overflowY: 'auto', paddingRight: '10px', flex: 1.2 }}>
               <div className="flex justify-between items-center bg-black/40 p-3 rounded-xl border border-white/10" style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
                 <div>
-                  <p className="text-gold font-display text-lg">{GET_CLASS_MAGIC_CAPACITY(selectedClass.id)?.magicType}</p>
+                  <p className="text-gold font-display text-lg">{getMagicCapacity(selectedClass.id)?.magicType}</p>
                 </div>
                 <div className="flex gap-4">
                   <div className="flex-col items-end">
-                    <span className="font-display text-lg text-purple-400">{selectedCantrips.length}/{GET_CLASS_MAGIC_CAPACITY(selectedClass.id)?.cantrips}</span>
+                    <span className="font-display text-lg text-purple-400">{selectedCantrips.length}/{getMagicCapacity(selectedClass.id)?.cantrips}</span>
                     <span className="text-muted text-[10px] uppercase">Trucos</span>
                   </div>
                   <div className="flex-col items-end">
-                    <span className="font-display text-lg text-blue-400">{selectedLvl1.length}/{GET_CLASS_MAGIC_CAPACITY(selectedClass.id)?.spells}</span>
+                    <span className="font-display text-lg text-blue-400">{selectedLvl1.length}/{getMagicCapacity(selectedClass.id)?.spells}</span>
                     <span className="text-muted text-[10px] uppercase">Lvl 1</span>
                   </div>
                 </div>
@@ -781,12 +780,12 @@ export default function CharacterCreator() {
               <div className="grid grid-cols-2 gap-2">
                 {(() => {
                   const srdSpells = getStarterSpellsForClass(selectedClass.id);
-                  const spells = srdSpells.cantrips.length > 0 ? srdSpells.cantrips : STARTER_SPELLS.cantrips;
+                  const spells = srdSpells.cantrips;
                   return spells.map(spell => {
                     const isActive = selectedCantrips.includes(spell.id);
-                    const cap = GET_CLASS_MAGIC_CAPACITY(selectedClass.id)?.cantrips || 0;
+                    const cap = getMagicCapacity(selectedClass.id)?.cantrips || 0;
                     const isMaxed = selectedCantrips.length >= cap && !isActive;
-                    const spellType = 'school' in spell ? (spell as any).school : (spell as any).type;
+                    const spellType = spell.type;
                     return (
                       <button key={spell.id}
                         onClick={() => { toggleSpell(spell.id, 'cantrip'); setPreviewSpell(spell); }}
@@ -806,12 +805,12 @@ export default function CharacterCreator() {
               <div className="grid grid-cols-2 gap-2 mb-6">
                 {(() => {
                   const srdSpells = getStarterSpellsForClass(selectedClass.id);
-                  const spells = srdSpells.level1.length > 0 ? srdSpells.level1 : STARTER_SPELLS.level_1;
+                  const spells = srdSpells.level1;
                   return spells.map(spell => {
                     const isActive = selectedLvl1.includes(spell.id);
-                    const cap = GET_CLASS_MAGIC_CAPACITY(selectedClass.id)?.spells || 0;
+                    const cap = getMagicCapacity(selectedClass.id)?.spells || 0;
                     const isMaxed = selectedLvl1.length >= cap && !isActive;
-                    const spellType = 'school' in spell ? (spell as any).school : (spell as any).type;
+                    const spellType = spell.type;
                     return (
                       <button key={spell.id}
                         onClick={() => { toggleSpell(spell.id, 'lvl1'); setPreviewSpell(spell); }}
@@ -856,7 +855,7 @@ export default function CharacterCreator() {
                   {'higherLevel' in previewSpell && previewSpell.higherLevel && (
                     <div className="p-2 mt-2 bg-blue-500/5 border border-blue-500/20 rounded">
                       <span className="font-bold text-blue-400 text-xs">A niveles superiores: </span>
-                      <span className="text-secondary text-xs">{previewSpell.higherLevel}</span>
+                      <p className="text-secondary text-xs leading-relaxed line-clamp-4">{previewSpell.higherLevel}</p>
                     </div>
                   )}
                 </div>
@@ -1070,7 +1069,7 @@ export default function CharacterCreator() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {[...selectedCantrips, ...selectedLvl1].map(sId => {
-                      const spell = [...STARTER_SPELLS.cantrips, ...STARTER_SPELLS.level_1].find(x => x.id === sId);
+                      const spell = ALL_SRD_SPELLS.find(x => x.id === sId);
                       return <span key={sId} className="px-3 py-1.5 bg-blue-900/20 rounded-lg text-[11px] text-blue-200 border border-blue-500/20 uppercase tracking-tighter">{spell?.name}</span>
                     })}
                   </div>
