@@ -34,7 +34,8 @@ export default function AdventureView() {
   const { characters, activeCharacterId } = useRoster();
   const { 
     sessions, currentSessionId, isLoading, addMessage, setLoading,
-    startCombat, endCombat, nextTurn, damageEntity, deleteSession 
+    startCombat, endCombat, nextTurn, damageEntity, deleteSession,
+    updateSessionHp
   } = useGameSession();
 
 
@@ -181,8 +182,38 @@ export default function AdventureView() {
           }
         }
 
-        updateHp(character.id, -dmg);
+        updateSessionHp(-dmg);
         addMessage({ role: 'system', text: `💥 ¡Has recibido ${dmg} puntos de daño!` });
+      }
+
+      // Check for [COMBATE: Name | HP | AC, ...] tags (Cap. 9)
+      const combatMatch = fullResponse.match(/\[COMBATE:\s*([^\]]+)\]/i);
+      if (combatMatch && character) {
+        const combatantsStr = combatMatch[1];
+        const enemies = combatantsStr.split(',').map(enemyStr => {
+          const [name, hpStr, acStr] = enemyStr.split('|').map(s => s.trim());
+          const hp = parseInt(hpStr) || 10;
+          return {
+            name: name,
+            hp: hp,
+            maxHp: hp, // Set maxHp equal to initial hp
+            ac: parseInt(acStr) || 10,
+            type: 'enemy' as const
+          };
+        });
+
+        const playerEntity = {
+          id: character.id,
+          name: character.name,
+          hp: currentSession?.playerHp ?? character.hp,
+          maxHp: currentSession?.playerMaxHp ?? character.maxHp,
+          ac: character.ac,
+          initiative: 0,
+          isPlayer: true
+        };
+
+        startCombat(playerEntity, enemies);
+        addMessage({ role: 'system', text: '⚔️ Se ha iniciado un combate. ¡Orden de iniciativa establecido!' });
       }
 
     } catch (err: any) {
@@ -259,8 +290,8 @@ export default function AdventureView() {
     const playerEntity = {
       id: character.id,
       name: character.name,
-      hp: character.hp,
-      maxHp: character.maxHp,
+      hp: currentSession?.playerHp ?? character.hp,
+      maxHp: currentSession?.playerMaxHp ?? character.maxHp,
       ac: character.ac,
       initiative: 0,
       isPlayer: true
@@ -324,6 +355,7 @@ export default function AdventureView() {
 
     if (result.isCritical) {
       updateHp(character.id, 1);
+      updateSessionHp(1);
       addMessage({ role: 'system', text: `✨ ¡20 NATURAL! Te recuperas con 1 HP y vuelves a la consciencia.` });
     } else if (result.isFumble) {
       addDeathSaveFailure(character.id, 2);
@@ -495,8 +527,8 @@ export default function AdventureView() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '12px', fontWeight: 'bold' }}>{character?.name}</div>
-            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-              LVL {character?.level} {character?.classes.map(c => `${c.name} ${c.level}`).join(' / ')}
+            <div style={{ fontSize: '10px', color: 'var(--accent-gold)' }}>
+              {currentSession?.playerHp} / {currentSession?.playerMaxHp} PG
             </div>
           </div>
           <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--accent-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'black' }}>
@@ -968,7 +1000,7 @@ export default function AdventureView() {
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <div className="glass-panel" style={{ flex: 1, padding: '15px', textAlign: 'center', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
                     <div style={{ fontSize: '9px', color: '#fca5a5' }}>PUNTOS DE VIDA</div>
-                    <div style={{ fontSize: '24px', color: 'white' }}>{character?.hp} / {character?.maxHp}</div>
+                    <div style={{ fontSize: '24px', color: 'white' }}>{currentSession?.playerHp} / {currentSession?.playerMaxHp}</div>
                   </div>
                   <div className="glass-panel" style={{ flex: 1, padding: '15px', textAlign: 'center', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
                     <div style={{ fontSize: '9px', color: '#93c5fd' }}>CLASE DE ARMADURA</div>
@@ -1346,6 +1378,9 @@ export default function AdventureView() {
                   const hd = character.hitDice?.find(d => d.current > 0);
                   if (hd) {
                     shortRest(character.id, hd.type, 1);
+                    // Recover HP in session too
+                    const heal = Math.floor(Math.random() * hd.type) + 1 + Math.floor(((character.attributes.con || 10) - 10) / 2);
+                    updateSessionHp(Math.max(1, heal));
                     addMessage({ role: 'system', text: `Has realizado un Descanso Corto. Usas un dado de golpe d${hd.type} para recuperar fuerzas.` });
                   } else {
                     alert('No te quedan dados de golpe.');
@@ -1370,6 +1405,7 @@ export default function AdventureView() {
               <button 
                 onClick={() => {
                   longRest(character.id);
+                  updateSessionHp(currentSession?.playerMaxHp || 99);
                   addMessage({ role: 'system', text: 'Realizas un Descanso Largo bajo la protección de la noche. Recuperas HP, Conjuros y 1 nivel de Agotamiento.' });
                   setShowRestModal(false);
                 }}

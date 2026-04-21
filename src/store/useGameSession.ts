@@ -15,6 +15,8 @@ export interface GameSession {
   moduleId: string | null;
   messages: ChatMessage[];
   updatedAt: number;
+  playerHp: number;
+  playerMaxHp: number;
   encounter?: CombatEncounter;
 }
 
@@ -24,12 +26,13 @@ interface GameSessionState {
   isLoading: boolean;
   
   // Actions
-  createSession: (characterName: string, characterId: string, moduleTitle: string, moduleId: string | null) => string | null;
+  createSession: (characterName: string, characterId: string, hp: number, maxHp: number, moduleTitle: string, moduleId: string | null) => string | null;
   resumeSession: (sessionId: string) => void;
   deleteSession: (sessionId: string) => void;
   addMessage: (msg: Omit<ChatMessage, 'timestamp'>) => void;
   setLoading: (v: boolean) => void;
   clearCurrentSession: () => void;
+  updateSessionHp: (amount: number) => void;
 
   // Combat Actions
   startCombat: (player: CombatEntity, enemies: Omit<CombatEntity, 'id' | 'initiative' | 'isPlayer'>[]) => void;
@@ -45,7 +48,7 @@ export const useGameSession = create<GameSessionState>()(
       currentSessionId: null,
       isLoading: false,
 
-      createSession: (characterName, characterId, moduleTitle, moduleId) => {
+      createSession: (characterName, characterId, hp, maxHp, moduleTitle, moduleId) => {
         const sessions = get().sessions;
         const sessionCount = Object.keys(sessions).length;
 
@@ -65,7 +68,9 @@ export const useGameSession = create<GameSessionState>()(
           characterId,
           moduleId,
           messages: [],
-          updatedAt: Date.now()
+          updatedAt: Date.now(),
+          playerHp: hp,
+          playerMaxHp: maxHp
         };
 
         set((state) => ({
@@ -114,6 +119,26 @@ export const useGameSession = create<GameSessionState>()(
       setLoading: (v) => set({ isLoading: v }),
 
       clearCurrentSession: () => set({ currentSessionId: null, isLoading: false }),
+
+      updateSessionHp: (amount) => {
+        const currentId = get().currentSessionId;
+        if (!currentId) return;
+
+        set((state) => {
+          const session = state.sessions[currentId];
+          if (!session) return state;
+
+          const updatedSession: GameSession = {
+            ...session,
+            playerHp: Math.max(0, Math.min(session.playerMaxHp, session.playerHp + amount)),
+            updatedAt: Date.now()
+          };
+
+          return {
+            sessions: { ...state.sessions, [currentId]: updatedSession }
+          };
+        });
+      },
 
       startCombat: (player, enemies) => {
         const currentId = get().currentSessionId;
@@ -206,9 +231,11 @@ export const useGameSession = create<GameSessionState>()(
           const session = state.sessions[currentId];
           if (!session?.encounter) return state;
 
+          let playerDamage = 0;
           const updatedEntities = session.encounter.entities.map(e => {
             if (e.id === entityId) {
               const newHp = Math.max(0, e.hp - amount);
+              if (e.isPlayer) playerDamage = amount;
               return { ...e, hp: newHp };
             }
             return e;
@@ -216,6 +243,9 @@ export const useGameSession = create<GameSessionState>()(
 
           const updatedSession: GameSession = {
             ...session,
+            playerHp: playerDamage > 0 
+              ? Math.max(0, session.playerHp - playerDamage)
+              : session.playerHp,
             encounter: {
               ...session.encounter,
               entities: updatedEntities

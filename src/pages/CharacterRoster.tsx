@@ -75,7 +75,13 @@ export default function CharacterRoster() {
                   <div className="flex items-center gap-2">
                     <button 
                       className="p-2 hover:bg-red-500/10 rounded-lg text-red-500/40 hover:text-red-500 transition-colors"
-                      onClick={(e) => { e.stopPropagation(); if(confirm('¿Borrar héroe?')) deleteCharacter(char.id) }}
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        const confirmed = window.confirm(`¿Seguro que deseas borrar a ${char.name}? Esta acción es irreversible.`);
+                        if (confirmed) {
+                          deleteCharacter(char.id);
+                        }
+                      }}
                     >
                       <Trash2 size={18} />
                     </button>

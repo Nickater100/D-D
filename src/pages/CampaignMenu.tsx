@@ -18,6 +18,8 @@ export default function CampaignMenu() {
     const sessionId = createSession(
       activeChar.name, 
       activeChar.id, 
+      activeChar.hp || activeChar.maxHp, // Initialize with current hp or max if undefined
+      activeChar.maxHp,
       mod?.title || 'Aventura', 
       moduleId
     );

@@ -45,6 +45,7 @@ export function cleanItemTags(text: string): string {
     .replace(/\[ITEM:\s*[^\]]+\]/gi, '')
     .replace(/\[XP:\s*[^\]]+\]/gi, '')
     .replace(/\[RASGO:\s*[^\]]+\]/gi, '')
+    .replace(/\[COMBATE:\s*[^\]]+\]/gi, '')
     .trim();
 }
 
