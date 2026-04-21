@@ -186,6 +186,20 @@ export default function AdventureView() {
         addMessage({ role: 'system', text: `💥 ¡Has recibido ${dmg} puntos de daño!` });
       }
 
+      // Check for [DAÑO_ENEMIGO: Enemy Name | Damage]
+      const enemyDmgRegex = /\[DAÑO_ENEMIGO:\s*([^|]+?)\s*\|\s*(\d+)\]/gi;
+      let enemyDmgMatch;
+      while ((enemyDmgMatch = enemyDmgRegex.exec(fullResponse)) !== null) {
+        if (encounter) {
+          const eName = enemyDmgMatch[1].trim();
+          const eDmg = parseInt(enemyDmgMatch[2]);
+          const target = encounter.entities.find(e => e.name.toLowerCase() === eName.toLowerCase() && !e.isPlayer);
+          if (target) {
+            damageEntity(target.id, eDmg);
+          }
+        }
+      }
+
       // Check for [COMBATE: Name | HP | AC, ...] tags (Cap. 9)
       const combatMatch = fullResponse.match(/\[COMBATE:\s*([^\]]+)\]/i);
       if (combatMatch && character) {
@@ -319,7 +333,8 @@ export default function AdventureView() {
     // Wait for display
     await new Promise(r => setTimeout(r, 1000));
     
-    const resultText = `Tirada realizada para [${result.formula}${result.dc ? ` | CD: ${result.dc}` : ''}]. Resultado: ${result.total} (${result.dice} + ${result.modifier})${result.isSuccess !== undefined ? (result.isSuccess ? ' - ¡ÉXITO!' : ' - FALLO') : ''}`;
+    const modSign = result.modifier >= 0 ? '+' : '-';
+    const resultText = `Tirada realizada para [${result.formula}${result.dc ? ` | CD: ${result.dc}` : ''}]. Resultado: ${result.total} (Base: ${result.dice}, Mod: ${modSign}${Math.abs(result.modifier)})${result.isSuccess !== undefined ? (result.isSuccess ? ' - ¡ÉXITO!' : ' - FALLO') : ''}`;
     addMessage({ role: 'system', text: resultText });
     
     setPendingRoll(null);
@@ -327,11 +342,13 @@ export default function AdventureView() {
     setRollResult(null);
 
     // Send the result to the AI automatically
-    const systemMsg = result.isCritical 
-      ? `[SISTEMA: ¡CRÍTICO NATURAL! El jugador ha sacado un 20. Total: ${result.total}. Éxito automático.]`
-      : result.isFumble
-      ? `[SISTEMA: ¡PIFIA NATURAL! El jugador ha sacado un 1. Total: ${result.total}. Fracaso automático.]`
-      : `[SISTEMA: Tirada realizada. Resultado: ${result.total} (${result.dice} + ${result.modifier})${result.dc ? `. Objetivo CD: ${result.dc}. ${result.isSuccess ? 'ÉXITO' : 'FRACASO'}` : ''}]`;
+    const isD20 = result.formula.toLowerCase().includes('d20');
+    
+    const systemMsg = (result.isCritical && isD20) 
+      ? `[SISTEMA: ¡CRÍTICO NATURAL! El jugador ha sacado un 20. Resultado final: ${result.total}. Éxito automático en d20.]`
+      : (result.isFumble && isD20)
+      ? `[SISTEMA: ¡PIFIA NATURAL! El jugador ha sacado un 1. Resultado final: ${result.total}. Fracaso automático en d20.]`
+      : `[SISTEMA: El jugador ha realizado la tirada solicitada. Resultado FINAL: ${result.total} (Dados puros: ${result.dice}, Modificador: ${modSign}${Math.abs(result.modifier)}). ${result.dc ? `Dificultad CD: ${result.dc} -> ${result.isSuccess ? 'ÉXITO' : 'FRACASO'}.` : ''} Por favor, continúa la narración aplicando las consecuencias de este resultado sin volver a pedir o repetir esta misma tirada.]`;
 
     sendMessage(systemMsg);
   };

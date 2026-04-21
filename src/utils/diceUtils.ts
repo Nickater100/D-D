@@ -31,25 +31,38 @@ export function parseRollRequest(input: string): RollRequest {
   return { formula, dc };
 }
 
-export function parseRollFormula(formula: string): { dieType: number; modifier: number } {
+export function parseRollFormula(formula: string): { count: number; dieType: number; modifier: number } {
   const clean = formula.toLowerCase().replace(/\s+/g, '');
-  const match = clean.match(/d(\d+)([+-]\d+)?/);
+  
+  // First try to match standard dice notation like "d20", "2d6", "8d6+4"
+  const diceMatch = clean.match(/(\d*)d(\d+)([+-]\d+)?/);
+  
+  if (diceMatch) {
+    const count = diceMatch[1] ? parseInt(diceMatch[1], 10) : 1;
+    const dieType = parseInt(diceMatch[2], 10);
+    const modifier = diceMatch[3] ? parseInt(diceMatch[3], 10) : 0;
+    return { count, dieType, modifier };
+  }
 
-  if (!match) return { dieType: 20, modifier: 0 };
-
-  const dieType = parseInt(match[1], 10);
-  const modifier = match[2] ? parseInt(match[2], 10) : 0;
-
-  return { dieType, modifier };
+  // If no "d", try to match just a trailing modifier (e.g., "Percepción+3")
+  const modMatch = clean.match(/([+-]\d+)$/);
+  const modifier = modMatch ? parseInt(modMatch[1], 10) : 0;
+  
+  return { count: 1, dieType: 20, modifier };
 }
 
 export function rollDice(request: RollRequest): RollResult {
-  const { dieType, modifier } = parseRollFormula(request.formula);
-  const dice = Math.floor(Math.random() * dieType) + 1;
-  const total = dice + modifier;
+  const { count, dieType, modifier } = parseRollFormula(request.formula);
   
-  const isCritical = dieType === 20 && dice === 20;
-  const isFumble = dieType === 20 && dice === 1;
+  let diceSum = 0;
+  for (let i = 0; i < count; i++) {
+    diceSum += Math.floor(Math.random() * dieType) + 1;
+  }
+  
+  const total = diceSum + modifier;
+  
+  const isCritical = dieType === 20 && count === 1 && diceSum === 20;
+  const isFumble = dieType === 20 && count === 1 && diceSum === 1;
   
   let isSuccess: boolean | undefined;
   if (request.dc !== undefined) {
@@ -59,7 +72,7 @@ export function rollDice(request: RollRequest): RollResult {
   }
 
   return {
-    dice,
+    dice: diceSum,
     modifier,
     total,
     formula: request.formula,

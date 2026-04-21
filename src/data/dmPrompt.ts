@@ -24,6 +24,14 @@ export function buildSystemPrompt(character: Character, module?: AdventureModule
   const spells = character.spells?.length ? character.spells.join(', ') : 'Ninguno.';
   const feats = character.feats?.join(', ') ?? 'Ninguno.';
 
+  const maxMentalMod = Math.max(
+    Math.floor((character.attributes.int - 10) / 2),
+    Math.floor((character.attributes.wis - 10) / 2),
+    Math.floor((character.attributes.cha - 10) / 2)
+  );
+  const spellSaveDC = 8 + character.proficiencyBonus + maxMentalMod;
+  const spellAttackMod = character.proficiencyBonus + maxMentalMod;
+
   const inventory = character.inventory?.length 
     ? character.inventory.map(i => `- ${i.name} (${i.category}): ${i.description}`).join('\n')
     : 'El inventario está vacío.';
@@ -127,6 +135,8 @@ ${feats}
 
 HECHIZOS CONOCIDOS:
 ${spells}
+CD de Salvación de Conjuros: ${spellSaveDC}
+Ataque de Conjuros: +${spellAttackMod}
 
 ${equipmentContext}
 
@@ -138,7 +148,7 @@ REGLAS DE CONDUCTA PARA EL DM:
 1. Siempre narra en SEGUNDA PERSONA singular ("Te encuentras ante...", "Escuchas un ruido...").
 2. Tus respuestas son CONCISAS pero evocadoras (máximo 4-5 oraciones por turno).
 3. Conoces perfectamente las habilidades y EQUIPO del personaje. Mencionarlos cuando sean relevantes.
-4. Cuando una acción requiera una tirada de dado, indica claramente: [TIRADA: d20 + modificador | CD: X] (donde X es la Clase de Dificultad apropiada).
+4. Cuando una acción requiera una tirada de dado (ataques, habilidades o DAÑO de hechizo), indica claramente: [TIRADA: d20 + modificador | CD: X] (donde X es la Clase de Dificultad apropiada). Si pides tirar daño mágico con varios dados, usa: [TIRADA: 8d6] y ESPERA a que el jugador lance.
 5. Cuando el jugador reciba un objeto, usa este formato: [ITEM: Nombre | Categoría | Subtipo | Propiedades | Descripción].
    - Categorías: "equipamiento", "consumible" u "otro".
    - Subtipos: "arma", "armadura", "escudo", "casco", "guantes", "botas", "capa", "amuleto", "anillo".
@@ -160,6 +170,7 @@ REGLAS DE CONDUCTA PARA EL DM:
 3. El jugador atacará usando botones. Si acierta, el sistema informará del daño. Tú debes describir narrativamente el efecto del golpe basándote en la vida restante del enemigo.
 4. Si un enemigo muere (0 HP), narra su derrota de forma satisfactoria.
 5. Usa el tag [DAÑO: X] solo si el jugador recibe daño de un enemigo, para que el sistema reste su vida.
+6. MUY IMPORTANTE: Si un enemigo pierde puntos de vida (por daño directo, hechizos, etc.), OBLIGATORIAMENTE debes usar el tag [DAÑO_ENEMIGO: NombreExacto | Cantidad] para que su barra de vida baje en la interfaz gráfica. Ejemplo: [DAÑO_ENEMIGO: Trasgo A | 12]
 
 INICIO: ${module?.startingMessage ? 'MUY IMPORTANTE: La aventura YA HA COMENZADO con un texto preescrito que el jugador acaba de leer. NO generes una nueva apertura. Tu primera respuesta debe ser una continuación directa de la escena descrita, reaccionando a la primera acción del jugador de forma coherente con el entorno ya establecido.' : 'Cuando el jugador comience, selecciona un escenario inicial apropiado para su clase y trasfondo. Descríbelo en una apertura corta y dramática de 3-4 oraciones. Luego pregunta qué hace.'}`;
 }
