@@ -129,7 +129,10 @@ export class OpenAIProvider extends AIProvider {
   }
 }
 
+// ─── Fallback Provider (60s per model, then tries next) ──────────────────────
 export class FallbackAIProvider extends AIProvider {
+  private readonly PER_MODEL_TIMEOUT_MS = 60_000; // 60 seconds per model
+
   constructor(private providers: AIProvider[]) {
     super();
     if (providers.length === 0) {
@@ -139,35 +142,65 @@ export class FallbackAIProvider extends AIProvider {
 
   async *sendMessageStream(messages: ChatMessage[], systemPrompt: string): AsyncGenerator<string, void, unknown> {
     let lastError: any;
-    
+
     for (let i = 0; i < this.providers.length; i++) {
       const provider = this.providers[i];
       try {
-        const stream = provider.sendMessageStream(messages, systemPrompt);
-        let hasYielded = false;
-        
-        try {
-          for await (const chunk of stream) {
-            hasYielded = true;
-            yield chunk;
+        // Buffer chunks so we can apply a per-model deadline without breaking the generator protocol
+        const streamGen = provider.sendMessageStream(messages, systemPrompt);
+        const chunks: string[] = [];
+        let iterDone = false;
+        let iterError: any = null;
+
+        // Consume stream in the background
+        const iterPromise = (async () => {
+          try {
+            for await (const chunk of streamGen) {
+              chunks.push(chunk);
+            }
+          } catch (e) {
+            iterError = e;
+          } finally {
+            iterDone = true;
           }
-          // Complete response from this provider
-          return; 
-        } catch (streamError) {
-          if (hasYielded) {
-             // UI already showed partial message, so we cannot safely fallback. Let it crash.
-             throw streamError;
+        })();
+
+        const deadline = Date.now() + this.PER_MODEL_TIMEOUT_MS;
+        let chunkIndex = 0;
+
+        while (true) {
+          // Emit whatever has been buffered so far
+          while (chunkIndex < chunks.length) {
+            yield chunks[chunkIndex++];
           }
-          // Failed before emitting chunks (e.g. Rate Limit / 429 / 502)
-          throw streamError;
+
+          if (iterDone) {
+            if (iterError) throw iterError;
+            break; // Clean finish
+          }
+
+          if (Date.now() > deadline) {
+            throw new Error(`Modelo ${i + 1} no respondió en ${this.PER_MODEL_TIMEOUT_MS / 1000}s`);
+          }
+
+          await new Promise(r => setTimeout(r, 80)); // small sleep to avoid busy-wait
         }
+
+        // Flush any remaining buffered chunks
+        while (chunkIndex < chunks.length) {
+          yield chunks[chunkIndex++];
+        }
+
+        await iterPromise;
+        return; // This model succeeded
+
       } catch (err: any) {
         lastError = err;
-        console.warn(`[Fallback] Falló un proveedor (index: ${i}), intentando el siguiente en la lista... (${err.message})`);
+        console.warn(`[Fallback] Modelo ${i + 1} falló (${err.message}). Probando siguiente...`);
         continue;
       }
     }
-    
+
     throw new Error(`Todos los modelos fallaron. Último error: ${lastError?.message || 'Desconocido'}`);
   }
 }

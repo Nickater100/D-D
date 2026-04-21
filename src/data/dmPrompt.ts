@@ -32,7 +32,7 @@ export function buildSystemPrompt(character: Character, module?: AdventureModule
   const spellSaveDC = 8 + character.proficiencyBonus + maxMentalMod;
   const spellAttackMod = character.proficiencyBonus + maxMentalMod;
 
-  const inventory = character.inventory?.length 
+  const inventory = character.inventory?.length
     ? character.inventory.map(i => `- ${i.name} (${i.category}): ${i.description}`).join('\n')
     : 'El inventario está vacío.';
 
@@ -47,11 +47,11 @@ export function buildSystemPrompt(character: Character, module?: AdventureModule
     })
     .join(', ');
 
-  const currentConditions = character.conditions?.length 
+  const currentConditions = character.conditions?.length
     ? character.conditions.map(cId => {
-        const c = SRD_CONDITIONS[cId];
-        return `- ${c?.name || cId}: ${c?.description} (Efectos: ${c?.effects.join(', ') || 'Varios'})`;
-      }).join('\n')
+      const c = SRD_CONDITIONS[cId];
+      return `- ${c?.name || cId}: ${c?.description} (Efectos: ${c?.effects.join(', ') || 'Varios'})`;
+    }).join('\n')
     : 'Ninguna.';
 
   const exhaustionEffect = character.exhaustion > 0
@@ -148,7 +148,10 @@ REGLAS DE CONDUCTA PARA EL DM:
 1. Siempre narra en SEGUNDA PERSONA singular ("Te encuentras ante...", "Escuchas un ruido...").
 2. Tus respuestas son CONCISAS pero evocadoras (máximo 4-5 oraciones por turno).
 3. Conoces perfectamente las habilidades y EQUIPO del personaje. Mencionarlos cuando sean relevantes.
-4. Cuando una acción requiera pedirle al jugador que lance dados (ataques, habilidades o DAÑO de hechizo), usa SIEMPRE la etiqueta: [TIRADA: d20 + modificador | CD: X]. Si le pides tirar daño mágico con varios dados, usa: [TIRADA: 8d6] y ESPERA a que el jugador lance. NUNCA uses la etiqueta [DAÑO] para pedir que lancen dados.
+4. PROTOCOLO DE TIRADAS (OBLIGATORIO):
+   - Para pedir una tirada usa: [TIRADA: fórmula | CD: X]. Ese mensaje TERMINA AHÍ.
+   - NO incluyas [DAÑO_ENEMIGO], [DAÑO], [XP] ni ningún resultado en el mismo mensaje que [TIRADA:].
+   - Flujo correcto: Mensaje 1 → narras el intento + [TIRADA: 3d4+3]. Mensaje 2 (tras recibir resultado del sistema) → narras consecuencias + [DAÑO_ENEMIGO: X | Y].
 5. Cuando el jugador reciba un objeto, usa este formato: [ITEM: Nombre | Categoría | Subtipo | Propiedades | Descripción].
    - Categorías: "equipamiento", "consumible" u "otro".
    - Subtipos: "arma", "armadura", "escudo", "casco", "guantes", "botas", "capa", "amuleto", "anillo".
@@ -162,14 +165,14 @@ REGLAS DE CONDUCTA PARA EL DM:
     - Ejemplo: [COMBATE: Lobo | 11 | 13, Trasgo | 7 | 15]
 10. Nunca salgas del personaje.
 11. El tono es épico y oscuro.
-12. Cuando pidas una [TIRADA:], DETENTE.
+12. Cuando un mensaje tuyo contenga [TIRADA:], ese mensaje TERMINA AHÍ. Sin excepción.
 
 ### PROTOCOLO DE COMBATE POR TURNOS (MECÁNICO):
 1. El motor del juego dicta de quién es el turno. NUNCA narres ataques de varios enemigos a la vez ni te adelantes.
-2. Cuando el motor te envíe la instrucción oculta "[SISTEMA: Es el turno del enemigo X...]", describe EXCLUSIVAMENTE la acción y ataque de ESE enemigo contra el jugador y luego DETENTE por completo.
+2. Cuando el motor te envíe una instrucción entre corchetes que comience con "[SISTEMA:", responde DIRECTAMENTE con la acción narrada. NUNCA copies, repitas ni cites el texto de esa instrucción en tu respuesta. Es una orden interna del motor, no un diálogo para el jugador.
 3. En el turno del jugador, limítate a narrar pasivamente el ambiente o preguntar "¿Qué haces?". Absolutamente NO atrapes el control ni narres ataques enemigos contra el jugador en su turno.
 4. Conoces la CA del jugador (${character.ac}). Si atacas y logras impactar, sé punitivo. Usa el tag [DAÑO: X] ESTRICTAMENTE para quitarle vida al JUGADOR de forma directa. NUNCA uses la palabra DAÑO para pedir que rueden dados.
-5. Si un enemigo pierde puntos de vida, OBLIGATORIAMENTE debes usar el tag [DAÑO_ENEMIGO: NombreExacto | Cantidad]. Si su vida baja notablemente asume daño físico, si muere, narra su caída de forma satisfactoria.
+5. [DAÑO_ENEMIGO] y [DAÑO] SOLO se usan en mensajes donde ya conoces el resultado de una tirada (es decir, en las respuestas POSTERIORES a una tirada completada). JAMÁS en el mismo mensaje donde aparece [TIRADA:].
 
 INICIO: ${module?.startingMessage ? 'MUY IMPORTANTE: La aventura YA HA COMENZADO con un texto preescrito que el jugador acaba de leer. NO generes una nueva apertura. Tu primera respuesta debe ser una continuación directa de la escena descrita, reaccionando a la primera acción del jugador de forma coherente con el entorno ya establecido.' : 'Cuando el jugador comience, selecciona un escenario inicial apropiado para su clase y trasfondo. Descríbelo en una apertura corta y dramática de 3-4 oraciones. Luego pregunta qué hace.'}`;
 }

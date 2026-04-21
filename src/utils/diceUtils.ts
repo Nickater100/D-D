@@ -86,5 +86,12 @@ export function rollDice(request: RollRequest): RollResult {
 export function extractRollRequest(text: string): RollRequest | null {
   const match = text.match(/\[TIRADA:\s*([^\]]+)\]/i);
   if (!match) return null;
-  return parseRollRequest(match[1]);
+  
+  const request = parseRollRequest(match[1]);
+  
+  // Only accept formulas that contain actual dice notation (must have the letter 'd')
+  // Prevents bare numbers like [TIRADA: 7] from being treated as a d20 roll
+  if (!request.formula.toLowerCase().includes('d')) return null;
+  
+  return request;
 }

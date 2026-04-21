@@ -51,6 +51,8 @@ export default function AdventureView() {
   const [isRolling, setIsRolling] = useState(false);
   const [rollResult, setRollResult] = useState<RollResult | null>(null);
   const [isEnemyActing, setIsEnemyActing] = useState(false);
+  const [isStuck, setIsStuck] = useState(false);
+  const loadingStartedAt = useRef<number | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -87,15 +89,18 @@ export default function AdventureView() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streamingText]);
 
-  // ─── Send to AI ────────────────────────────────────────────────────────────
-  const sendMessage = useCallback(async (userText: string | null, isOpening = false) => {
+  // silent=true: userText is NOT shown in chat UI.
+  // systemExtra: injected into the system prompt directly (not as a user message).
+  const sendMessage = useCallback(async (userText: string | null, isOpening = false, silent = false, systemExtra = '') => {
     if (!character) return;
 
     setError(null);
     setLoading(true);
+    setIsStuck(false);
+    loadingStartedAt.current = Date.now();
     setStreamingText('');
 
-    if (userText) {
+    if (userText && !silent) {
       addMessage({ role: 'user', text: userText });
     }
 
@@ -104,26 +109,42 @@ export default function AdventureView() {
 
       const history: ChatMessage[] = messages
         .filter(_m => !isOpening)
+        // Never include internal [SISTEMA:] instructions in history
+        .filter(m => !(m.role === 'user' && m.text.startsWith('[SISTEMA:')))
+        .filter(m => m.role === 'user' || m.role === 'model')
         .map(m => ({
           role: m.role as 'user' | 'model',
           text: m.text,
         }));
 
-      const systemPrompt = buildSystemPrompt(character, activeModule, encounter);
+      // systemExtra is appended to the system prompt instead of sent as a user message
+      const baseSystemPrompt = buildSystemPrompt(character, activeModule, encounter);
+      const systemPrompt = systemExtra ? `${baseSystemPrompt}\n\nINSTRUCCIÓN ACTUAL DEL MOTOR: ${systemExtra}` : baseSystemPrompt;
+
       const promptText = isOpening
         ? 'Comienza la aventura con una apertura épica.'
-        : userText ?? '';
+        : (systemExtra ? 'Continúa la historia.' : (userText ?? ''));
 
       // Prepare context for the provider (history + current message)
       const currentMessages: ChatMessage[] = [...history, { role: 'user', text: promptText }];
 
-      const stream = await ai.sendMessageStream(currentMessages, systemPrompt);
+      // Safety net: 210s total (3 models × 60s each + buffer). The per-model timeout in
+      // FallbackAIProvider handles individual failover; this only fires if everything collapses.
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Todos los modelos tardaron demasiado. Por favor recarga la página.')), 210_000)
+      );
+
+      const streamGen = ai.sendMessageStream(currentMessages, systemPrompt);
 
       let fullResponse = '';
-      for await (const chunk of stream) {
-        fullResponse += chunk;
-        setStreamingText(fullResponse);
-      }
+      // Stream with timeout on each chunk
+      const iterate = async () => {
+        for await (const chunk of streamGen) {
+          fullResponse += chunk;
+          setStreamingText(fullResponse);
+        }
+      };
+      await Promise.race([iterate(), timeout]);
 
       addMessage({ role: 'model', text: cleanItemTags(fullResponse) });
       setStreamingText('');
@@ -163,40 +184,51 @@ export default function AdventureView() {
         setPendingRoll(rollReq);
       }
 
-      // Check for [DAÑO: X] tags (Cap. 9)
-      const damageMatch = fullResponse.match(/\[DAÑO:\s*(\d+)\]/i);
-      if (damageMatch && character) {
-        const dmg = parseInt(damageMatch[1]);
-        
-        // Concentration Check (Cap. 10)
-        if (character.concentration && dmg > 0) {
-          const conMod = Math.floor(((character.attributes.con || 10) - 10) / 2);
-          const saveRoll = Math.floor(Math.random() * 20) + 1;
-          const total = saveRoll + conMod + (character.proficiencyBonus); // Using proficiency for saves
-          const dc = Math.max(10, Math.floor(dmg / 2));
+      // 🥊 SAFETY CHECK: If the AI requested a roll, IGNORE any damage tags in the same message.
+      // The damage should only be applied in the NEXT message after the roll result is known.
+      if (!rollReq) {
+        // Check for [DAÑO: X] tags (Cap. 9)
+        const damageMatch = fullResponse.match(/\[DAÑO:\s*(\d+)\]/i);
+        if (damageMatch && character) {
+          const dmg = parseInt(damageMatch[1]);
           
-          if (total < dc) {
-            setConcentration(character.id, null);
-            addMessage({ role: 'system', text: `💔 ¡Has perdido la concentración! (${total} vs CD ${dc})` });
-          } else {
-            addMessage({ role: 'system', text: `🛡️ Mantienes la concentración (${total} vs CD ${dc})` });
+          // Concentration Check (Cap. 10)
+          if (character.concentration && dmg > 0) {
+            const conMod = Math.floor(((character.attributes.con || 10) - 10) / 2);
+            const saveRoll = Math.floor(Math.random() * 20) + 1;
+            const total = saveRoll + conMod + (character.proficiencyBonus); // Using proficiency for saves
+            const dc = Math.max(10, Math.floor(dmg / 2));
+            
+            if (total < dc) {
+              setConcentration(character.id, null);
+              addMessage({ role: 'system', text: `💔 ¡Has perdido la concentración! (${total} vs CD ${dc})` });
+            } else {
+              addMessage({ role: 'system', text: `🛡️ Mantienes la concentración (${total} vs CD ${dc})` });
+            }
+          }
+
+          updateSessionHp(-dmg);
+          updateHp(character.id, -dmg); // Keep roster character HP in sync
+          addMessage({ role: 'system', text: `💥 ¡Has recibido ${dmg} puntos de daño!` });
+
+          // Check if player is now at 0 HP
+          const newHp = (currentSession?.playerHp ?? character.hp) - dmg;
+          if (newHp <= 0) {
+            addMessage({ role: 'system', text: `💤 ¡Has caído inconsciente! Debes superar salvaciones de muerte para sobrevivir. (Tira 3 veces o recibe ayuda antes de fallar 3.)` });
           }
         }
 
-        updateSessionHp(-dmg);
-        addMessage({ role: 'system', text: `💥 ¡Has recibido ${dmg} puntos de daño!` });
-      }
-
-      // Check for [DAÑO_ENEMIGO: Enemy Name | Damage]
-      const enemyDmgRegex = /\[DAÑO_ENEMIGO:\s*([^|]+?)\s*\|\s*(\d+)\]/gi;
-      let enemyDmgMatch;
-      while ((enemyDmgMatch = enemyDmgRegex.exec(fullResponse)) !== null) {
-        if (encounter) {
-          const eName = enemyDmgMatch[1].trim();
-          const eDmg = parseInt(enemyDmgMatch[2]);
-          const target = encounter.entities.find(e => e.name.toLowerCase() === eName.toLowerCase() && !e.isPlayer);
-          if (target) {
-            damageEntity(target.id, eDmg);
+        // Check for [DAÑO_ENEMIGO: Enemy Name | Damage]
+        const enemyDmgRegex = /\[DAÑO_ENEMIGO:\s*([^|]+?)\s*\|\s*(\d+)\]/gi;
+        let enemyDmgMatch;
+        while ((enemyDmgMatch = enemyDmgRegex.exec(fullResponse)) !== null) {
+          if (encounter) {
+            const eName = enemyDmgMatch[1].trim();
+            const eDmg = parseInt(enemyDmgMatch[2]);
+            const target = encounter.entities.find(e => e.name.toLowerCase() === eName.toLowerCase() && !e.isPlayer);
+            if (target) {
+              damageEntity(target.id, eDmg);
+            }
           }
         }
       }
@@ -241,6 +273,8 @@ export default function AdventureView() {
       setError(msg);
     } finally {
       setLoading(false);
+      setIsStuck(false);
+      loadingStartedAt.current = null;
     }
   }, [character, messages, activeModule, addMessage, setLoading, encounter, updateHp]);
 
@@ -342,16 +376,16 @@ export default function AdventureView() {
     setIsRolling(false);
     setRollResult(null);
 
-    // Send the result to the AI automatically
+    // Send the result to the AI silently (no chat bubble for the system instruction)
     const isD20 = result.formula.toLowerCase().includes('d20');
     
     const systemMsg = (result.isCritical && isD20) 
-      ? `[SISTEMA: ¡CRÍTICO NATURAL! El jugador ha sacado un 20. Resultado final: ${result.total}. Éxito automático en d20.]`
+      ? `[SISTEMA: ¡CRÍTICO NATURAL! El jugador ha sacado un 20. Resultado final: ${result.total}. Éxito automático en d20. Narra el resultado sin pedir ninguna tirada adicional.]`
       : (result.isFumble && isD20)
-      ? `[SISTEMA: ¡PIFIA NATURAL! El jugador ha sacado un 1. Resultado final: ${result.total}. Fracaso automático en d20.]`
-      : `[SISTEMA: El jugador ha realizado la tirada solicitada. Resultado FINAL: ${result.total} (Dados puros: ${result.dice}, Modificador: ${modSign}${Math.abs(result.modifier)}). ${result.dc ? `Dificultad CD: ${result.dc} -> ${result.isSuccess ? 'ÉXITO' : 'FRACASO'}.` : ''} Por favor, continúa la narración aplicando las consecuencias de este resultado sin volver a pedir o repetir esta misma tirada.]`;
+      ? `[SISTEMA: ¡PIFIA NATURAL! El jugador ha sacado un 1. Resultado final: ${result.total}. Fracaso automático en d20. Narra el resultado sin pedir ninguna tirada adicional.]`
+      : `[SISTEMA: El jugador ha realizado la tirada solicitada. Resultado FINAL: ${result.total} (Dados: ${result.dice}, Modificador: ${modSign}${Math.abs(result.modifier)}). ${result.dc ? `Dificultad CD: ${result.dc} -> ${result.isSuccess ? 'ÉXITO' : 'FRACASO'}.` : ''} Narra las consecuencias de este resultado. IMPORTANTE: No solicites ni generes ningún [TIRADA] adicional por esta acción.]`;
 
-    sendMessage(systemMsg);
+    sendMessage(systemMsg, false, true); // silent=true — system context, not a player message
   };
 
   // ─── Death Saving Throws (Cap. 9) ──────────────────────────────────────────
@@ -406,6 +440,27 @@ export default function AdventureView() {
     }
   }, [character?.deathSaves?.failure, currentSessionId, deleteSession, navigate]);
 
+  // ─── Stuck detector: if loading for > 15s show emergency button ──────────────────
+  useEffect(() => {
+    if (!isLoading) {
+      setIsStuck(false);
+      return;
+    }
+    const timer = setTimeout(() => setIsStuck(true), 70_000);
+    return () => clearTimeout(timer);
+  }, [isLoading]);
+
+  const handleForceResume = useCallback(() => {
+    setLoading(false);
+    setIsEnemyActing(false);
+    setIsStuck(false);
+    setStreamingText('');
+    loadingStartedAt.current = null;
+    // Reset the lastProcessedTurn so the current turn can retry if needed
+    lastProcessedTurn.current = null;
+    addMessage({ role: 'system', text: '⚠️ El narrador tardó demasiado. Turno restablecido. Puedes continuar jugando.' });
+  }, [setLoading, addMessage]);
+
   // ─── End Player Turn ────────────────────────────────────────────────────────
   const handleEndPlayerTurn = useCallback(() => {
     if (!encounter?.isActive || !isPlayerTurn || isLoading) return;
@@ -421,19 +476,20 @@ export default function AdventureView() {
       lastProcessedTurn.current = encounter.turnIndex;
       setIsEnemyActing(true);
 
-      // Show a system message announcing the turn
-      const hpInfo = `${currentTurnEntity.hp}/${currentTurnEntity.maxHp} HP`;
-      addMessage({ role: 'system', text: `⚔️ TURNO DE: ${currentTurnEntity.name.toUpperCase()} (${hpInfo}) — CA ${currentTurnEntity.ac}` });
+      try {
+        const hpInfo = `${currentTurnEntity.hp}/${currentTurnEntity.maxHp} HP`;
+        addMessage({ role: 'system', text: `⚔️ TURNO DE: ${currentTurnEntity.name.toUpperCase()} (${hpInfo}) — CA ${currentTurnEntity.ac}` });
 
-      await new Promise(r => setTimeout(r, 900));
+        await new Promise(r => setTimeout(r, 900));
 
-      // Build a precise instruction for the AI
-      const prompt = `[SISTEMA: Es el turno de ${currentTurnEntity.name} (${hpInfo}, CA ${currentTurnEntity.ac}). Narra ÚNICAMENTE la acción de combate de ESTE enemigo contra el jugador. Lanza su ataque mental contra la CA ${character?.ac ?? 0} del jugador. Si impacta, aplica el daño correspondiente con la etiqueta [DAÑO: X]. Cuando termines esta acción, DETENTE. No narres a otros enemigos ni al jugador.]`;
-      await sendMessage(prompt);
-
-      setIsEnemyActing(false);
-      // Automatically advance to the next turn after AI finishes narrating
-      nextTurn();
+        // Build the enemy turn instruction and inject it into the SYSTEM PROMPT, not as a user message
+        // This prevents weak LLMs from echoing the instruction back in their response
+        const enemyInstruction = `Es el turno de ${currentTurnEntity.name} (${hpInfo}, CA ${currentTurnEntity.ac}). Narra ÚNICAMENTE su acción de combate contra el jugador (CA ${character?.ac ?? 0}). Si impacta, usa [DAÑO: X]. Luego DETENTE.`;
+        await sendMessage(null, false, false, enemyInstruction);
+      } finally {
+        setIsEnemyActing(false);
+        nextTurn();
+      }
     };
 
     triggerAiTurn();
@@ -665,6 +721,10 @@ export default function AdventureView() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {messages.map((msg, i) => {
+                  // Hide internal system instructions (user-role only) — sent to AI silently
+                  // but may be persisted from older sessions. Never hide model responses.
+                  if (msg.role === 'user' && msg.text.startsWith('[SISTEMA:')) return null;
+
                   if (msg.role === 'model') return <DmBubble key={i} text={msg.text} />;
                   if (msg.role === 'user') return <PlayerBubble key={i} text={msg.text} />;
                   // System messages: use special turn banner style if they announce a turn
@@ -722,6 +782,19 @@ export default function AdventureView() {
                   <div style={{ fontSize: '10px', color: isPlayerTurn ? 'var(--accent-gold)' : '#f87171', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase' }}>
                     {isPlayerTurn ? '🔧 TUS ACCIONES' : `⏳ TURNO DE ${currentTurnEntity?.name?.toUpperCase()}`}
                   </div>
+
+                  {/* Emergency unstuck button */}
+                  {isStuck && (
+                    <div style={{ marginBottom: '10px', padding: '8px 12px', background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.4)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                      <span style={{ fontSize: '11px', color: '#fbbf24' }}>⚠️ El narrador no responde...</span>
+                      <button
+                        onClick={handleForceResume}
+                        style={{ padding: '4px 14px', borderRadius: '6px', background: 'rgba(251,191,36,0.2)', border: '1px solid #fbbf24', color: '#fbbf24', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
+                      >
+                        Forzar Continuar
+                      </button>
+                    </div>
+                  )}
                   
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     {isPlayerTurn && character && character.hp > 0 && character.inventory?.filter(i => (character.equipment as any)?.mainHand === i.id || (character.equipment as any)?.ranged === i.id).map(weapon => (
