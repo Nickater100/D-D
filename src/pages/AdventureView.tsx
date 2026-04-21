@@ -50,6 +50,7 @@ export default function AdventureView() {
   const [pendingRoll, setPendingRoll] = useState<RollRequest | null>(null);
   const [isRolling, setIsRolling] = useState(false);
   const [rollResult, setRollResult] = useState<RollResult | null>(null);
+  const [isEnemyActing, setIsEnemyActing] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -405,23 +406,38 @@ export default function AdventureView() {
     }
   }, [character?.deathSaves?.failure, currentSessionId, deleteSession, navigate]);
 
+  // ─── End Player Turn ────────────────────────────────────────────────────────
+  const handleEndPlayerTurn = useCallback(() => {
+    if (!encounter?.isActive || !isPlayerTurn || isLoading) return;
+    nextTurn();
+  }, [encounter?.isActive, isPlayerTurn, isLoading, nextTurn]);
+
   // ─── AI Combat Turn Trigger (Cap. 9) ───────────────────────────────────────
   useEffect(() => {
-    if (!encounter?.isActive || isPlayerTurn || isLoading || !currentTurnEntity) return;
-    
-    // Prevent double-triggering for the same turn
+    if (!encounter?.isActive || isPlayerTurn || isLoading || !currentTurnEntity || isEnemyActing) return;
     if (lastProcessedTurn.current === encounter.turnIndex) return;
 
-    // It's an enemy's turn! Prompt the DM.
     const triggerAiTurn = async () => {
       lastProcessedTurn.current = encounter.turnIndex;
-      // Small delay for natural flow
-      await new Promise(r => setTimeout(r, 1200));
-      sendMessage(`[TURNO: ${currentTurnEntity.name}] DM: Realiza su acción de combate siguiendo las reglas.`);
+      setIsEnemyActing(true);
+
+      // Show a system message announcing the turn
+      const hpInfo = `${currentTurnEntity.hp}/${currentTurnEntity.maxHp} HP`;
+      addMessage({ role: 'system', text: `⚔️ TURNO DE: ${currentTurnEntity.name.toUpperCase()} (${hpInfo}) — CA ${currentTurnEntity.ac}` });
+
+      await new Promise(r => setTimeout(r, 900));
+
+      // Build a precise instruction for the AI
+      const prompt = `[SISTEMA: Es el turno de ${currentTurnEntity.name} (${hpInfo}, CA ${currentTurnEntity.ac}). Narra ÚNICAMENTE la acción de combate de ESTE enemigo contra el jugador. Lanza su ataque mental contra la CA ${character?.ac ?? 0} del jugador. Si impacta, aplica el daño correspondiente con la etiqueta [DAÑO: X]. Cuando termines esta acción, DETENTE. No narres a otros enemigos ni al jugador.]`;
+      await sendMessage(prompt);
+
+      setIsEnemyActing(false);
+      // Automatically advance to the next turn after AI finishes narrating
+      nextTurn();
     };
 
     triggerAiTurn();
-  }, [encounter?.isActive, encounter?.turnIndex, isPlayerTurn, isLoading, currentTurnEntity, sendMessage]);
+  }, [encounter?.isActive, encounter?.turnIndex, isPlayerTurn, isLoading, currentTurnEntity, isEnemyActing, sendMessage, addMessage, nextTurn, character?.ac]);
 
   // ─── Start session on mount ───────────────────────────────────────────────
   useEffect(() => {
@@ -562,22 +578,44 @@ export default function AdventureView() {
             {/* COMBAT INITIATIVE BANNER (Cap. 9) */}
             {encounter?.isActive && (
               <div style={{ 
-                background: 'rgba(212,175,55,0.05)', borderBottom: '1px solid rgba(212,175,55,0.2)',
+                background: isPlayerTurn ? 'rgba(74,222,128,0.05)' : 'rgba(239,68,68,0.05)',
+                borderBottom: `1px solid ${isPlayerTurn ? 'rgba(74,222,128,0.25)' : 'rgba(239,68,68,0.25)'}`,
                 padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '15px', overflowX: 'auto',
-                backdropFilter: 'blur(10px)', zIndex: 10
+                backdropFilter: 'blur(10px)', zIndex: 10, transition: 'all 0.4s ease'
               }}>
-                <div style={{ fontSize: '10px', color: 'var(--accent-gold)', fontWeight: 'bold', whiteSpace: 'nowrap' }}>RONDA {encounter.round} | TURNO:</div>
+                <div style={{ fontSize: '10px', color: isPlayerTurn ? '#4ade80' : '#f87171', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                  RONDA {encounter.round} | {isPlayerTurn ? '✅ TU TURNO' : `⚔️ ENEMIGO ACTÚA`}
+                </div>
                 {encounter.entities.map((e, i) => (
                   <div key={e.id} style={{
                     display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px',
-                    borderRadius: '20px', background: encounter.turnIndex === i ? 'var(--accent-gold)' : 'rgba(255,255,255,0.05)',
+                    borderRadius: '20px',
+                    background: encounter.turnIndex === i
+                      ? (e.isPlayer ? '#4ade80' : '#ef4444')
+                      : 'rgba(255,255,255,0.05)',
                     border: `1px solid ${encounter.turnIndex === i ? 'white' : 'rgba(255,255,255,0.1)'}`,
+                    opacity: e.hp <= 0 ? 0.3 : 1,
                     transition: 'all 0.3s ease'
                   }}>
                     <span style={{ fontSize: '10px', color: encounter.turnIndex === i ? 'black' : 'white', fontWeight: 'bold' }}>{e.initiative}</span>
                     <span style={{ fontSize: '12px', color: encounter.turnIndex === i ? 'black' : 'white' }}>{e.name}</span>
                   </div>
                 ))}
+                {isPlayerTurn && (
+                  <button
+                    onClick={handleEndPlayerTurn}
+                    disabled={isLoading || !!pendingRoll}
+                    style={{
+                      marginLeft: 'auto', padding: '4px 14px', borderRadius: '20px',
+                      background: 'rgba(74,222,128,0.15)', border: '1px solid #4ade80',
+                      color: '#4ade80', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer',
+                      whiteSpace: 'nowrap', opacity: (isLoading || !!pendingRoll) ? 0.4 : 1,
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    Terminar Turno →
+                  </button>
+                )}
               </div>
             )}
 
@@ -629,6 +667,25 @@ export default function AdventureView() {
                 {messages.map((msg, i) => {
                   if (msg.role === 'model') return <DmBubble key={i} text={msg.text} />;
                   if (msg.role === 'user') return <PlayerBubble key={i} text={msg.text} />;
+                  // System messages: use special turn banner style if they announce a turn
+                  const isTurnBanner = msg.text.startsWith('⚔️ TURNO DE:');
+                  if (isTurnBanner) {
+                    return (
+                      <div key={i} style={{
+                        display: 'flex', justifyContent: 'center', margin: '8px 0'
+                      }}>
+                        <div style={{
+                          padding: '6px 20px', borderRadius: '30px',
+                          background: 'rgba(239,68,68,0.12)',
+                          border: '1px solid rgba(239,68,68,0.35)',
+                          color: '#fca5a5', fontSize: '11px', fontWeight: 'bold',
+                          letterSpacing: '0.08em', fontFamily: 'monospace'
+                        }}>
+                          {msg.text}
+                        </div>
+                      </div>
+                    );
+                  }
                   return <SystemBubble key={i} text={msg.text} />;
                 })}
                 
