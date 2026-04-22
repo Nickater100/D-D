@@ -132,9 +132,11 @@ export class OpenAIProvider extends AIProvider {
 // ─── Fallback Provider (60s per model, then tries next) ──────────────────────
 export class FallbackAIProvider extends AIProvider {
   private readonly PER_MODEL_TIMEOUT_MS = 60_000; // 60 seconds per model
+  private providers: AIProvider[];
 
-  constructor(private providers: AIProvider[]) {
+  constructor(providers: AIProvider[]) {
     super();
+    this.providers = providers;
     if (providers.length === 0) {
       throw new Error('FallbackAIProvider necesita al menos un proveedor.');
     }
@@ -216,13 +218,13 @@ export function getAIProvider(): AIProvider {
   }
 
   const modelsStr = import.meta.env.VITE_AI_MODELS || import.meta.env.VITE_AI_MODEL || '';
-  const modelsArray = modelsStr.split(',').map(m => m.trim().replace(/^['"](.*)['"]$/, '$1')).filter(Boolean);
+  const modelsArray = modelsStr.split(',').map((m: string) => m.trim().replace(/^['"](.*)['"]$/, '$1')).filter(Boolean);
 
   if (modelsArray.length === 0) {
     modelsArray.push(provider.toLowerCase() === 'gemini' ? 'gemini-2.0-flash' : 'gpt-4o');
   }
 
-  const instantiatedProviders: AIProvider[] = modelsArray.map(model => {
+  const instantiatedProviders: AIProvider[] = modelsArray.map((model: string) => {
     switch (provider.toLowerCase()) {
       case 'gemini':
         return new GeminiProvider({ apiKey, model, baseUrl });
