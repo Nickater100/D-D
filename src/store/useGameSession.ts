@@ -148,15 +148,15 @@ export const useGameSession = create<GameSessionState>()(
         const roll = (mod: number = 0) => Math.floor(Math.random() * 20) + 1 + mod;
 
         const combatants: CombatEntity[] = [
-          { ...player, initiative: roll() }, // Assuming dex mod is already in roll result or passed
+          { ...player, initiative: roll(player.dexMod || 0) }, 
           ...enemies.map((e, index) => ({
             ...e,
             id: `enemy-${index}-${Date.now()}`,
             isPlayer: false,
-            initiative: roll(),
+            initiative: roll(e.dexMod || 0),
             type: 'enemy' as const
           }))
-        ].sort((a, b) => b.initiative - a.initiative);
+        ].sort((a, b) => b.initiative - a.initiative || (b.isPlayer ? 1 : -1));
 
         set((state) => {
           const session = state.sessions[currentId];

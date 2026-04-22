@@ -14,9 +14,11 @@ import { ShoppingBag, Sword as SwordIcon, Package, Trash, Shield, ShieldQuestion
 import { SRD_FEATS } from '../data/srd/feats';
 import { SRD_SKILLS } from '../data/srd/skills';
 import { SRD_CONDITIONS } from '../data/srd/conditions';
+import { findCreature } from '../data/srd/creatures';
+import { calculateModifier } from '../utils/statsUtils';
 import { calculateSkillBonus, calculateSavingThrowBonus, calculatePassiveScore } from '../utils/statsUtils';
 import { extractItemsFromText, cleanItemTags, extractXpFromText, extractFeaturesFromText } from '../utils/itemUtils';
-import { rollAttack, rollDamage } from '../utils/combatUtils';
+import { rollAttack, rollDamage, rollCreatureAttack, rollCreatureDamage } from '../utils/combatUtils';
 import { ALL_SRD_SPELLS } from '../data/srd/spells';
 
 // ─── AI Service (Now handled via .env) ───────────────────────────────────────
@@ -108,7 +110,6 @@ export default function AdventureView() {
       const ai = getAIProvider();
 
       const history: ChatMessage[] = messages
-        .filter(_m => !isOpening)
         // Never include internal [SISTEMA:] instructions in history
         .filter(m => !(m.role === 'user' && m.text.startsWith('[SISTEMA:')))
         .filter(m => m.role === 'user' || m.role === 'model')
@@ -122,16 +123,20 @@ export default function AdventureView() {
       const systemPrompt = systemExtra ? `${baseSystemPrompt}\n\nINSTRUCCIÓN ACTUAL DEL MOTOR: ${systemExtra}` : baseSystemPrompt;
 
       const promptText = isOpening
-        ? 'Comienza la aventura con una apertura épica.'
+        ? (activeModule?.startingMessage || 'Comienza la aventura con una apertura épica.')
         : (systemExtra ? 'Continúa la historia.' : (userText ?? ''));
+
+      // If opening, we SAVE the prompt as a system message or a silent user message to preserve history consistency
+      if (isOpening) {
+        addMessage({ role: 'user', text: promptText });
+      }
 
       // Prepare context for the provider (history + current message)
       const currentMessages: ChatMessage[] = [...history, { role: 'user', text: promptText }];
 
-      // Safety net: 210s total (3 models × 60s each + buffer). The per-model timeout in
-      // FallbackAIProvider handles individual failover; this only fires if everything collapses.
+      // Safety net: 100s total (reduced for better UX). 
       const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Todos los modelos tardaron demasiado. Por favor recarga la página.')), 210_000)
+        setTimeout(() => reject(new Error('Todos los modelos tardaron demasiado. Por favor recarga la página.')), 100_000)
       );
 
       const streamGen = ai.sendMessageStream(currentMessages, systemPrompt);
@@ -238,13 +243,33 @@ export default function AdventureView() {
       if (combatMatch && character) {
         const combatantsStr = combatMatch[1];
         const enemies = combatantsStr.split(',').map(enemyStr => {
-          const [name, hpStr, acStr] = enemyStr.split('|').map(s => s.trim());
-          const hp = parseInt(hpStr) || 10;
+          const parts = enemyStr.split('|').map(s => s.trim());
+          const name = parts[0];
+          
+          // 1. Try to find in SRD database
+          const creatureDef = findCreature(name);
+          
+          if (creatureDef) {
+            return {
+              name: creatureDef.name,
+              hp: creatureDef.hp,
+              maxHp: creatureDef.hp,
+              ac: creatureDef.ac,
+              type: 'enemy' as const,
+              attacks: creatureDef.attacks,
+              multiattack: creatureDef.multiattack,
+              dexMod: calculateModifier(creatureDef.dex),
+              creatureId: creatureDef.id
+            };
+          }
+
+          // 2. Fallback to AI-provided stats if available
+          const hp = parseInt(parts[1]) || 10;
           return {
             name: name,
             hp: hp,
-            maxHp: hp, // Set maxHp equal to initial hp
-            ac: parseInt(acStr) || 10,
+            maxHp: hp,
+            ac: parseInt(parts[2]) || 10,
             type: 'enemy' as const
           };
         });
@@ -256,7 +281,8 @@ export default function AdventureView() {
           maxHp: currentSession?.playerMaxHp ?? character.maxHp,
           ac: character.ac,
           initiative: 0,
-          isPlayer: true
+          isPlayer: true,
+          dexMod: calculateModifier(character.attributes.dex)
         };
 
         startCombat(playerEntity, enemies);
@@ -482,10 +508,53 @@ export default function AdventureView() {
 
         await new Promise(r => setTimeout(r, 900));
 
-        // Build the enemy turn instruction and inject it into the SYSTEM PROMPT, not as a user message
-        // This prevents weak LLMs from echoing the instruction back in their response
-        const enemyInstruction = `Es el turno de ${currentTurnEntity.name} (${hpInfo}, CA ${currentTurnEntity.ac}). Narra ÚNICAMENTE su acción de combate contra el jugador (CA ${character?.ac ?? 0}). Si impacta, usa [DAÑO: X]. Luego DETENTE.`;
-        await sendMessage(null, false, false, enemyInstruction);
+        // MECHANICAL TURN
+        let turnNarration = '';
+        const target = character;
+        
+        if (currentTurnEntity.attacks && currentTurnEntity.attacks.length > 0 && target) {
+          const attacksToExecute: any[] = [];
+          
+          if (currentTurnEntity.multiattack) {
+            const desc = currentTurnEntity.multiattack.toLowerCase();
+            // Complex multiattack parsing could go here, but let's do a simple version:
+            if (desc.includes("three")) {
+              attacksToExecute.push(currentTurnEntity.attacks[0], currentTurnEntity.attacks[0], currentTurnEntity.attacks[0]);
+            } else if (desc.includes("two")) {
+              attacksToExecute.push(currentTurnEntity.attacks[0], currentTurnEntity.attacks[0]);
+            } else {
+              attacksToExecute.push(currentTurnEntity.attacks[0]);
+            }
+          } else {
+            attacksToExecute.push(currentTurnEntity.attacks[0]);
+          }
+
+          let totalDamage = 0;
+          let results = [];
+
+          for (const attack of attacksToExecute) {
+            const attackRoll = rollCreatureAttack(attack, target.ac);
+            if (attackRoll.hit) {
+              const damage = rollCreatureDamage(attack, attackRoll.isCrit);
+              totalDamage += damage.total;
+              results.push(`🎲 ${attack.name}: ${attackRoll.total} vs CA ${target.ac} -> 💥 IMPACTO (${damage.detail})`);
+            } else {
+              results.push(`🎲 ${attack.name}: ${attackRoll.total} vs CA ${target.ac} -> ❌ FALLO`);
+            }
+          }
+
+          if (totalDamage > 0) {
+            updateSessionHp(-totalDamage);
+            updateHp(character.id, -totalDamage);
+          }
+
+          turnNarration = `[SISTEMA: ${currentTurnEntity.name} ha actuado.\nResultados mecánicos:\n${results.join('\n')}\nDaño total recibido por el jugador: ${totalDamage}.\nNarra la acción de forma épica basándote en estos resultados. NO generes tiradas adicionales ni más daño.]`;
+        } else {
+          // Fallback if no attack data
+          turnNarration = `Es el turno de ${currentTurnEntity.name} (${hpInfo}, CA ${currentTurnEntity.ac}). Narra ÚNICAMENTE su acción de combate contra el jugador (CA ${character?.ac ?? 0}). Si impacta, usa [DAÑO: X]. Luego DETENTE.`;
+        }
+
+        await sendMessage(null, false, false, turnNarration);
       } finally {
         setIsEnemyActing(false);
         nextTurn();
@@ -493,7 +562,7 @@ export default function AdventureView() {
     };
 
     triggerAiTurn();
-  }, [encounter?.isActive, encounter?.turnIndex, isPlayerTurn, isLoading, currentTurnEntity, isEnemyActing, sendMessage, addMessage, nextTurn, character?.ac]);
+  }, [encounter?.isActive, encounter?.turnIndex, isPlayerTurn, isLoading, currentTurnEntity, isEnemyActing, sendMessage, addMessage, nextTurn, character, updateHp, updateSessionHp]);
 
   // ─── Start session on mount ───────────────────────────────────────────────
   useEffect(() => {

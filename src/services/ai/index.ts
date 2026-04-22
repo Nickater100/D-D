@@ -131,7 +131,7 @@ export class OpenAIProvider extends AIProvider {
 
 // ─── Fallback Provider (60s per model, then tries next) ──────────────────────
 export class FallbackAIProvider extends AIProvider {
-  private readonly PER_MODEL_TIMEOUT_MS = 60_000; // 60 seconds per model
+  private readonly PER_MODEL_TIMEOUT_MS = 30_000; // 30 seconds per model
   private providers: AIProvider[];
 
   constructor(providers: AIProvider[]) {
@@ -178,6 +178,8 @@ export class FallbackAIProvider extends AIProvider {
 
           if (iterDone) {
             if (iterError) throw iterError;
+            // If the stream finished without emitting any chunks, it's also an error
+            if (chunks.length === 0) throw new Error("Respuesta vacía del modelo");
             break; // Clean finish
           }
 

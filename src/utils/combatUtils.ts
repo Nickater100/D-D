@@ -1,4 +1,4 @@
-import type { Character, Item } from '../types/dnd';
+import type { Character, Item, CreatureAttack } from '../types/dnd';
 import { calculateModifier } from './statsUtils';
 
 export interface RollDetail {
@@ -102,4 +102,55 @@ export function rollDamage(character: Character, item: Item, isCrit: boolean = f
     total: Math.max(1, rollTotal + bonus),
     type
   };
+}
+
+/**
+ * Executes a d20 attack roll for a creature.
+ */
+export function rollCreatureAttack(attack: CreatureAttack, targetAC: number): { hit: boolean; roll: number; total: number; isCrit: boolean; isFumble: boolean; } {
+  const roll = Math.floor(Math.random() * 20) + 1;
+  const total = roll + attack.toHit;
+  const isCrit = roll === 20;
+  const isFumble = roll === 1;
+  const hit = isCrit || (!isFumble && total >= targetAC);
+
+  return { hit, roll, total, isCrit, isFumble };
+}
+
+/**
+ * Executes a damage roll for a creature's attack.
+ */
+export function rollCreatureDamage(attack: CreatureAttack, isCrit: boolean = false): { total: number; detail: string; type: string } {
+  const diceStr = attack.damage;
+  const type = attack.damageType;
+
+  const rollDice = (str: string, crit: boolean) => {
+    if (!str) return 0;
+    // Handle formats like "2d4+2" or "1d8"
+    const match = str.match(/(\d+)d(\d+)([+-]\d+)?/);
+    if (!match) return 0;
+    
+    const count = parseInt(match[1]);
+    const sides = parseInt(match[2]);
+    const bonus = parseInt(match[3] || '0');
+    
+    let total = 0;
+    const numDice = crit ? count * 2 : count;
+    for (let i = 0; i < numDice; i++) {
+      total += Math.floor(Math.random() * sides) + 1;
+    }
+    return total + bonus;
+  };
+
+  const primaryDamage = rollDice(diceStr, isCrit);
+  let total = primaryDamage;
+  let detail = `${primaryDamage} (${type})`;
+
+  if (attack.extraDamage) {
+    const extraDamage = rollDice(attack.extraDamage, isCrit);
+    total += extraDamage;
+    detail += ` + ${extraDamage} (${attack.extraDamageType || 'extra'})`;
+  }
+
+  return { total: Math.max(1, total), detail, type };
 }

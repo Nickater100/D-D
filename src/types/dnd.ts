@@ -120,6 +120,16 @@ export interface Character {
   deathSaves?: { success: number; failure: number };
 }
 
+export interface CreatureAttack {
+  name: string;
+  toHit: number;
+  damage: string;
+  damageType: string;
+  extraDamage?: string;
+  extraDamageType?: string;
+  description?: string;
+}
+
 export interface CombatEntity {
   id: string;
   name: string;
@@ -129,6 +139,10 @@ export interface CombatEntity {
   initiative: number;
   isPlayer: boolean;
   type?: 'enemy' | 'ally' | 'neutral';
+  attacks?: CreatureAttack[];
+  multiattack?: string;
+  dexMod?: number;
+  creatureId?: string;
 }
 
 export interface CombatEncounter {
